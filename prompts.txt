@@ -1,0 +1,81 @@
+PHASE 0 - SETUP AND PLANNING
+-----------------------------
+
+[Refined Prompt 0.1 - Project Kickoff and Full Brief]
+
+Build a Python CLI tool called Dialogue Frame Finder. Given a video URL
+(including OK.ru) and a target dialogue line, find the first video frame
+where that line is visually visible as burned-in text on screen, and
+report: the frame as a PNG, the timestamp in seconds (from real fps),
+the frame number, the OCR-recognized text, and a confidence level with
+reasoning (High, Low, or Not Found).
+
+The approved technology stack is:
+  - yt-dlp for video download
+  - ffmpeg and OpenCV for frame extraction, using real fps from ffprobe
+  - faster-whisper (base/tiny model, word-level timestamps) for coarse ASR window
+  - PaddleOCR as primary OCR engine
+  - RapidFuzz partial_ratio for fuzzy text matching
+  - Python, pytest, Docker (CPU-only, no Compose)
+
+The algorithm has four stages:
+  Stage 0: Download video
+  Stage 1: Coarse localization via ASR + fuzzy match to get search window
+  Stage 2: Fallback - full-video scan if ASR finds nothing
+  Stage 3: Coarse-to-fine frame search + bisection + persistence check
+  Stage 4: Report with confidence bucket (High/Low/Not Found)
+
+Confidence thresholds live in config.py only (no magic numbers elsewhere).
+Every module raises its own typed exception. main.py catches at top level.
+Project structure is fixed per the spec in Section 6. No extra files.
+
+Additional implementation constraints added:
+  1. Treat the architecture as baseline; stop and explain before changing
+     any major design decision due to implementation reality.
+  2. Verify the OK.ru URL early in Phase 1 before building the rest.
+  3. Frame search: include neighboring-frame verification and local
+     sequential check around the estimated transition.
+  4. No Tesseract fallback unless actually tested and providing recovery.
+  5. At each phase checkpoint: explain what was built, why, how to modify it,
+     what tests ran, the results, and any problems resolved.
+  6. Core algorithm logic (localization, matching, confidence, frame refinement,
+     persistence, not-found) must be visible in our own code.
+  7. Before final submission: clean-clone verification.
+  8. Final cross-check: every requirement marked PASS/PARTIAL/FAIL.
+
+Execute Phase 0 only: create folder structure with stubs, write config.py
+with all named constants, write models.py with dataclasses, write
+requirements.txt, and write stub files for every module from Section 6.
+Stop and show the structure before writing any pipeline logic.
+
+note: logged after cross-verification with the original request.
+The user's prompt was a complete project brief (Sections 0-10). The
+refined version above preserves the exact technical decisions, stack,
+algorithm stages, constraints, and behavioral rules, condensed to
+remove repetition. The intent is identical.
+
+
+[Refined Prompt 0.2 - Phase 0 Execution Approval]
+
+Create the project scaffold for Phase 0:
+  - All directories and stub files matching the structure in Section 6
+  - config.py with all thresholds, model sizes, and sampling rates as
+    named constants, with comments explaining each one
+  - models.py with TranscriptSegment, SearchWindow, FrameCandidate,
+    and FinderResult as plain dataclasses with no logic
+  - requirements.txt with pinned minimum versions for all dependencies
+  - Stub files for every module: each stub defines the public function
+    signatures and raises NotImplementedError, so the import graph is
+    valid from the start
+  - tests/ folder with stub test files and a fixtures/README.txt
+  - prompts.txt started as a living document
+
+Do not implement any pipeline logic in this phase.
+
+note: logged after cross-verification with the original request.
+This prompt covers what was actually built in Phase 0.
+
+
+ITERATIONS AND CORRECTIONS
+---------------------------
+(none yet - Phase 0 is the first phase)

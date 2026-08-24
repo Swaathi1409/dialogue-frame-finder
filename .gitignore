@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Output directory (generated frame PNGs)
+output/
+
+# Downloaded videos and audio (can be large)
+*.mp4
+*.mkv
+*.webm
+*.avi
+*.wav
+*.mp3
+# Keep synthetic test fixture - it's committed intentionally
+!tests/fixtures/*.mp4
+
+# PaddleOCR / faster-whisper model caches
+# These get downloaded at runtime or baked into Docker
+~/.paddleocr/
+~/.cache/huggingface/
+inference/
+models/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp / scratch
+*.tmp
+*.log
+scratch/

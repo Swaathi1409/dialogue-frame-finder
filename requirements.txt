@@ -1,0 +1,26 @@
+# Core video acquisition
+yt-dlp>=2024.1.1
+
+# Frame extraction and video processing
+opencv-python-headless>=4.9.0
+numpy>=1.24.0
+
+# ASR - coarse temporal localization
+faster-whisper>=1.0.0
+
+# OCR - visual text detection (primary engine)
+paddleocr>=2.7.0
+paddlepaddle>=2.6.0
+
+# Text matching
+rapidfuzz>=3.6.0
+
+# CLI and utilities
+# (argparse is in the standard library, no extra install needed)
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Optional but useful for generating synthetic test fixtures
+# opencv-python-headless already covers this
