@@ -227,3 +227,17 @@ tests can pass a fake without any real video or model. write tests covering
 local scan, persistence, and search_frames. be token-efficient going forward.
 
 note: user flagged token usage. keeping explanations short from here.
+
+
+PHASE 5 - PIPELINE AND CLI
+
+Prompt 5.1
+
+what I typed:
+continue
+
+cleaner version:
+build pipeline.py (orchestrates all stages) and cli.py (arg parsing,
+result printing, error handling). add __main__.py so python -m dialogue_finder
+works. verify with --help and run all tests.
+
