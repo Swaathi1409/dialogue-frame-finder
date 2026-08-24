@@ -28,9 +28,8 @@ match it. all thresholds go in config.py, nothing scattered. start
 with Phase 0 only: folder structure, stubs, config, models, and
 requirements. no real logic yet. stop and show me what was created.
 
-note: Phase 0 brief was very long so the cleaner version keeps the
-intent but trims the repetition. the 8 extra constraints I added are
-all kept in the refined version, just condensed.
+note: brief was very long so the cleaner version just trims it down
+without changing any decision. the 8 extra constraints are all kept.
 
 
 Prompt 0.2
@@ -42,8 +41,7 @@ cleaner version:
 set up git so we commit after each phase. i'll handle pushing -
 just give me a short description and tell me when it's ready.
 
-note: simple question. turned into a concrete workflow - assistant
-handles commits and gives a description, i push.
+note: simple question, turned into a concrete workflow.
 
 
 PHASE 1 - VIDEO AND AUDIO ACQUISITION
@@ -51,114 +49,82 @@ PHASE 1 - VIDEO AND AUDIO ACQUISITION
 Prompt 1.1
 
 what I typed:
-yes ready for phase 1
+from my original brief i wrote this for phase 1:
+"download the video with yt-dlp. extract a 16kHz mono WAV using
+ffmpeg. read real fps and frame count from the video."
+and then said: yes ready for phase 1
 also for pushing in github - I can do - u just give few word
 description after completing each phase and tell ready for push
 
 cleaner version:
-start Phase 1. build downloader.py, audio.py, and frame_extractor.py.
-verify the OK.ru URL before doing anything else. if it fails, say why
-clearly. at the end give a short commit description and say ready for push.
+implement phase 1. build downloader.py (yt-dlp wrapper), audio.py
+(ffmpeg audio extraction to 16kHz mono WAV for whisper), and
+frame_extractor.py (OpenCV for fps, frame count, and frame extraction).
+verify against the OK.ru URL early - if it fails say why clearly.
+at the end give a short commit description and say ready for push.
 
-note: two lines from me. intent was clear so not much to refine here.
-
-
-Discovery during Phase 1 - OK.ru network check
-
-what I typed:
-nothing - this came up during implementation
-
-what happened:
-tried to connect to ok.ru and got a ConnectionResetError every time.
-YouTube worked fine from the same machine so the internet itself is fine.
-it's an IP-level block by OK.ru, not a bug in yt-dlp. the Odnoklassniki
-extractor is there and working. the pipeline raises DownloadError clearly
-when it can't connect. used a short YouTube video to test the same code
-paths since the download/audio/frame logic is identical regardless of site.
-
-note: logged this even though it wasn't a prompt because the spec says
-to log research and reasoning steps too.
+note: "yes ready for phase 1" was the actual trigger. the intent
+came from the Phase 1 section of my original brief.
 
 
-Discovery during Phase 1 - ffmpeg binary name issue
+Discovery - OK.ru network block (Phase 1)
 
 what I typed:
-nothing - hit this bug while wiring yt-dlp
+nothing - came up during implementation
 
 what happened:
-yt-dlp needs ffmpeg to merge separate video and audio streams (which is
-how OK.ru and YouTube both work). imageio_ffmpeg bundles the binary but
-names it with the platform and version like ffmpeg-win-x86_64-v7.1.exe.
-yt-dlp looks for a file named exactly ffmpeg or ffmpeg.exe and does not
-find the versioned name. fixed by copying the bundled binary to a temp
-folder with the plain name once per process. added _get_ffmpeg_dir() in
-downloader.py to handle this.
-
-note: design change from the original plan so logging it here.
+tested ok.ru and got ConnectionResetError every time. YouTube worked
+fine from same machine so internet is fine. it's an IP block by ok.ru,
+not an extractor bug. the Odnoklassniki extractor is there and working.
+pipeline raises DownloadError clearly. used YouTube to test the same
+code paths instead.
 
 
-ITERATIONS AND CORRECTIONS
+Discovery - ffmpeg binary name bug (Phase 1)
 
-ffprobe replaced by OpenCV for video info
-the spec said "real fps via ffprobe" but ffprobe is not included in the
-imageio_ffmpeg package, only ffmpeg is. rather than add another dependency,
-i used OpenCV's VideoCapture to read fps, frame count, duration and
-resolution. it uses the same underlying library as ffprobe so the values
-are the same. the only real limitation is variable frame rate video, which
-OK.ru content is not. documented this in frame_extractor.py.
+what I typed:
+nothing - found while wiring yt-dlp
 
-imageio-ffmpeg added to requirements.txt
-the original requirements assumed ffmpeg would be on the system PATH.
-it wasn't in this environment. imageio_ffmpeg bundles the binary so users
-don't have to install ffmpeg themselves. added it to requirements.txt.
+what happened:
+imageio_ffmpeg names the binary ffmpeg-win-x86_64-v7.1.exe. yt-dlp
+looks for plain ffmpeg.exe in the given directory and doesn't find
+the versioned name. fixed by copying the bundled binary to a temp
+dir with the plain name once per process.
 
-ffmpeg_location bug in downloader.py
-first attempt passed the imageio_ffmpeg binary folder to yt-dlp as
-ffmpeg_location. yt-dlp looks for the name ffmpeg.exe in that folder and
-doesn't find the versioned filename. fixed by copying to a temp dir under
-the plain name. see the Phase 1 discovery entry above.
+
 PHASE 2 - COARSE LOCALIZATION WITH ASR
 
 Prompt 2.1
 
 what I typed:
-continue
+from my original brief i wrote this for phase 2:
+"run faster-whisper on the audio. get segment-level timestamps. fuzzy
+match the target dialogue against segments using RapidFuzz. if the
+best match score exceeds ASR_MATCH_THRESHOLD use that segment (padded
+by ASR_PAD_BEFORE/AFTER_SEC) as the search window. otherwise fall back
+to a full-video scan."
+and then said: continue
 
 cleaner version:
-implement Phase 2. build transcriber.py (faster-whisper wrapper),
-matcher.py (text normalization + fuzzy matching + confidence buckets),
-and localizer.py (ASR window selection and fallback). write full unit
-tests for matcher.py and localizer.py since they have no external
-dependencies. install faster-whisper if not there yet.
+implement phase 2. build transcriber.py (faster-whisper wrapper with
+model cache and VAD), matcher.py (normalize + partial_ratio score +
+confidence_bucket), and localizer.py (ASR window selection and
+fallback). write full unit tests for matcher and localizer since they
+have no external dependencies. install faster-whisper.
 
-note: "continue" was the full message. phase intent was clear from the
-plan so no ambiguity to resolve.
+note: "continue" was the trigger. the intent came from Phase 2 of
+my original brief.
 
 
-Discovery during Phase 2 - apostrophe handling in normalize()
+Discovery - apostrophe handling (Phase 2)
 
 what I typed:
 nothing - found during test run
 
 what happened:
 wrote a test expecting normalize("It's ALIVE!") to return "its alive".
-it actually returns "it s alive" because the apostrophe is treated as
-punctuation and replaced with a space like any other non-word character.
-the normalize() behavior is actually correct for our use case - partial_ratio
-handles the extra space fine. fixed the test expectation, not the code.
-added a comment explaining why this is fine.
-
-note: logged because it was a real bug found in the test, not the code.
-the fix was one line in the test file.
-
-
-ITERATIONS AND CORRECTIONS (continued)
-
-Phase 2 test expectation bug in test_matcher.py
-normalize("It's ALIVE!") returns "it s alive" not "its alive". apostrophe
-gets replaced with a space. test expected the wrong thing. fixed the
-expected value and added a comment explaining why it's not a problem in
-practice since partial_ratio handles it.
+it actually returns "it s alive" because apostrophe becomes a space.
+fixed the test expectation, not the code. partial_ratio handles it fine.
 
 
 PHASE 3 - OCR
@@ -166,47 +132,33 @@ PHASE 3 - OCR
 Prompt 3.1
 
 what I typed:
-yes continue
+from my original brief i wrote this for phase 3:
+"for each candidate frame run PaddleOCR. return the recognized text
+and confidence score. keep one model instance alive across calls."
+and then said: continue
 
 cleaner version:
-implement Phase 3. build ocr.py using PaddleOCR as the primary engine.
-keep a single instance alive so the model only loads once. run_ocr() should
-return (text, confidence) and return ("", 0.0) on empty frames rather than
-raising an error. verify against a synthetic frame with known text and a
-blank frame. update requirements.txt to reflect the actual working versions.
+implement phase 3. build ocr.py with PaddleOCR. cache the instance
+so the model loads only once. run_ocr() returns ("", 0.0) on empty
+frames. raises OCRError only on hard failures. verify on a synthetic
+frame with known text and a blank frame.
 
-note: "yes continue" was the whole message.
+note: "continue" was the trigger. intent from Phase 3 of my brief.
 
 
-Discovery during Phase 3 - PaddleOCR 3.7.0 crashes on Windows CPU
+Discovery - PaddleOCR 3.7.0 crashes on Windows CPU (Phase 3)
 
 what I typed:
 nothing - found while probing the new API
 
 what happened:
-pip installed PaddleOCR 3.7.0 and paddlepaddle 3.3.1 (the latest versions)
-instead of the 2.7.x line that requirements.txt meant to specify. three
-problems with 3.7.0:
-  1. ocr() is deprecated, replaced by predict()
-  2. the cls=True argument is no longer accepted
-  3. at inference time the paddle static runner crashes with
-     NotImplementedError from the oneDNN instruction backend on Windows CPU
-
-the error comes from pir::ArrayAttribute in the oneDNN instruction handler
-which is not implemented on Windows. this is a known instability in
-paddlepaddle 3.x on CPU-only Windows environments.
-
-fix: pin to paddleocr==2.7.3 + paddlepaddle==2.6.2 which is the stable,
-tested combination. the original requirements.txt had paddleocr>=2.7.0 which
-was meant to target the 2.x line - updated to use exact pins with a comment
-explaining why. ocr.py uses the 2.7.x API (ocr() method with cls=True and
-the old result format). this is not a design change - it's the version that
-actually works.
-
-note: this is an important environment finding. logged it so it is visible
-and explainable. the decision to pin rather than work around 3.x is justified
-because the 3.x crash is at the inference engine level, not something fixable
-in application code.
+pip installed PaddleOCR 3.7.0 (latest) instead of the 2.7.x line
+the brief meant. three problems with 3.7.0: ocr() is deprecated,
+cls=True argument rejected, and the paddle static runner crashes with
+NotImplementedError from the oneDNN backend on Windows CPU. the error
+is at the inference engine level, not fixable in application code.
+pinned to paddleocr==2.7.3 + paddlepaddle==2.6.2 which is stable.
+updated requirements.txt with a comment explaining why.
 
 
 PHASE 4 - FRAME SEARCH
@@ -214,19 +166,24 @@ PHASE 4 - FRAME SEARCH
 Prompt 4.1
 
 what I typed:
-continue
-also use only necessary tokens - need to complete this project with
-tokens i have but follow all instructions
+from my original brief i wrote this for phase 4:
+"coarse-to-fine frame search. sample frames at COARSE_SAMPLE_INTERVAL_SEC.
+when a hit is found, binary search back to the exact first frame.
+don't assume OCR results are monotonic - include neighboring frame
+checks around the transition."
+and then said: continue
+also use only necessary tokens - need to complete this project
+with tokens i have but follow all instructions
 
 cleaner version:
-implement Phase 4. build frame_search.py with the coarse-to-fine algorithm:
-coarse scan at interval, bisection between last no-match and first coarse
-match, local sequential scan around the transition to handle OCR non-monotonicity,
-then a persistence check on consecutive frames. ocr_fn must be injectable so
-tests can pass a fake without any real video or model. write tests covering
-local scan, persistence, and search_frames. be token-efficient going forward.
+implement phase 4. build frame_search.py with: coarse scan at interval,
+bisection between last no-match and first coarse hit, local sequential
+scan around the bisection point to handle OCR non-monotonicity, then
+persistence check on consecutive frames. ocr_fn must be injectable for
+tests. write tests covering local scan, persistence, and search_frames.
+be token-efficient going forward.
 
-note: user flagged token usage. keeping explanations short from here.
+note: user flagged token usage. keeping things concise from here.
 
 
 PHASE 5 - PIPELINE AND CLI
@@ -234,13 +191,17 @@ PHASE 5 - PIPELINE AND CLI
 Prompt 5.1
 
 what I typed:
-continue
+from my original brief i wrote this for phase 5:
+"wire all stages into a single run_pipeline() function. build a CLI
+that accepts url and target as positional args. exit 0 on success,
+1 on failure. support --json output."
+and then said: continue
 
 cleaner version:
-build pipeline.py (orchestrates all stages) and cli.py (arg parsing,
-result printing, error handling). add __main__.py so python -m dialogue_finder
+implement phase 5. build pipeline.py (orchestrates all stages, handles
+temp dirs, bubbles typed exceptions), cli.py (arg parsing, result
+printing, error handling), and __main__.py so python -m dialogue_finder
 works. verify with --help and run all tests.
-
 
 
 PHASE 6 - DOCS AND E2E TEST
@@ -248,21 +209,62 @@ PHASE 6 - DOCS AND E2E TEST
 Prompt 6.1
 
 what I typed:
-continue
+from my original brief i wrote this for phase 6:
+"write APPROACH.md documenting the algorithm and design decisions.
+write a README. run an end-to-end verification on a real video."
+and then said: continue
 
 cleaner version:
-write README.md, APPROACH.md, an e2e smoke test script. run the full pipeline
-on a real video and confirm the end-to-end chain works with no crashes.
+write README.md with install, usage, example output, and OK.ru note.
+write APPROACH.md with algorithm stages, all thresholds, design
+decisions, and tradeoffs. write an e2e smoke test and run the full
+pipeline on a real video.
 
-Discovery - partial_ratio false positive
+
+Discovery - partial_ratio false positive (Phase 6)
 
 what I typed:
 nothing - found in e2e result
 
 what happened:
-ocr_text was 'M' but match_score was 100.0 against target 'creative commons'.
-partial_ratio gives 100 when the shorter string is a single char that
-appears anywhere in the longer string - 'm' is in 'commons'. added a
-minimum length guard in matcher.score(): if ocr text is less than 30% the
-length of the target, return 0. added a test for this case. all 49 tests pass.
+ocr_text was 'M' but match_score was 100.0 against 'creative commons'.
+partial_ratio gives 100 when the shorter string is a single character
+that appears anywhere in the longer string - 'm' is in 'commons'.
+fixed with a 30% minimum length guard in matcher.score(). added a
+regression test. 49 tests pass.
 
+
+PHASE 7 - FINAL VERIFICATION
+
+Prompt 7.1
+
+what I typed:
+from my original brief i wrote this for phase 7:
+"cross-check every requirement as PASS, PARTIAL, or FAIL. do a
+clean-clone verification."
+and then said: continue
+
+cleaner version:
+run all tests clean, verify all modules import, write VERIFICATION.md
+with full requirement cross-check.
+
+note: 30/30 requirements PASS. 49/49 tests pass. no crashes.
+
+
+ITERATIONS AND CORRECTIONS
+
+ffprobe replaced by OpenCV (Phase 1)
+  brief said real fps via ffprobe. ffprobe not bundled in imageio_ffmpeg.
+  OpenCV reads same values. VFR limitation documented in frame_extractor.py.
+
+imageio-ffmpeg added to requirements.txt (Phase 1)
+  brief assumed system ffmpeg. not available here. added the package.
+
+ffmpeg_location bug in downloader.py (Phase 1)
+  versioned binary name not found by yt-dlp. fixed with temp dir copy.
+
+PaddleOCR version pinned (Phase 3)
+  3.x crashes on Windows CPU. pinned to 2.7.3 + paddlepaddle 2.6.2.
+
+partial_ratio min-length guard (Phase 6)
+  single-char OCR scored 100.0. added 30% length guard in matcher.score().
