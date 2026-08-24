@@ -74,6 +74,12 @@ class TestScore:
     def test_both_empty_returns_zero(self):
         assert matcher.score("", "") == 0.0
 
+    def test_very_short_ocr_returns_zero(self):
+        # "m" appears in "creative commons" so partial_ratio would give 100.0
+        # without the length guard. This must return 0.
+        assert matcher.score("M", "creative commons") == 0.0
+        assert matcher.score("a", "I am going home") == 0.0
+
     def test_punctuation_differences_ignored(self):
         # target has comma and exclamation, ocr has neither
         s = matcher.score("hello world", "Hello, World!")

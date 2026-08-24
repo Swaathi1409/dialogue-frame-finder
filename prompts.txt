@@ -241,3 +241,28 @@ build pipeline.py (orchestrates all stages) and cli.py (arg parsing,
 result printing, error handling). add __main__.py so python -m dialogue_finder
 works. verify with --help and run all tests.
 
+
+
+PHASE 6 - DOCS AND E2E TEST
+
+Prompt 6.1
+
+what I typed:
+continue
+
+cleaner version:
+write README.md, APPROACH.md, an e2e smoke test script. run the full pipeline
+on a real video and confirm the end-to-end chain works with no crashes.
+
+Discovery - partial_ratio false positive
+
+what I typed:
+nothing - found in e2e result
+
+what happened:
+ocr_text was 'M' but match_score was 100.0 against target 'creative commons'.
+partial_ratio gives 100 when the shorter string is a single char that
+appears anywhere in the longer string - 'm' is in 'commons'. added a
+minimum length guard in matcher.score(): if ocr text is less than 30% the
+length of the target, return 0. added a test for this case. all 49 tests pass.
+

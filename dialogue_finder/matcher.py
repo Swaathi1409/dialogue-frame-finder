@@ -57,6 +57,13 @@ def score(ocr_text: str, target: str) -> float:
     if not norm_ocr or not norm_target:
         return 0.0
 
+    # partial_ratio gives 100 for any 1-character match because it finds
+    # the best same-length substring. "m" scores 100 against "creative commons"
+    # because 'm' appears in 'commons'. Reject OCR text that is much shorter
+    # than the target - it can't be a real match.
+    if len(norm_ocr) < len(norm_target) * 0.3:
+        return 0.0
+
     return fuzz.partial_ratio(norm_target, norm_ocr)
 
 
