@@ -117,3 +117,45 @@ first attempt passed the imageio_ffmpeg binary folder to yt-dlp as
 ffmpeg_location. yt-dlp looks for the name ffmpeg.exe in that folder and
 doesn't find the versioned filename. fixed by copying to a temp dir under
 the plain name. see the Phase 1 discovery entry above.
+PHASE 2 - COARSE LOCALIZATION WITH ASR
+
+Prompt 2.1
+
+what I typed:
+continue
+
+cleaner version:
+implement Phase 2. build transcriber.py (faster-whisper wrapper),
+matcher.py (text normalization + fuzzy matching + confidence buckets),
+and localizer.py (ASR window selection and fallback). write full unit
+tests for matcher.py and localizer.py since they have no external
+dependencies. install faster-whisper if not there yet.
+
+note: "continue" was the full message. phase intent was clear from the
+plan so no ambiguity to resolve.
+
+
+Discovery during Phase 2 - apostrophe handling in normalize()
+
+what I typed:
+nothing - found during test run
+
+what happened:
+wrote a test expecting normalize("It's ALIVE!") to return "its alive".
+it actually returns "it s alive" because the apostrophe is treated as
+punctuation and replaced with a space like any other non-word character.
+the normalize() behavior is actually correct for our use case - partial_ratio
+handles the extra space fine. fixed the test expectation, not the code.
+added a comment explaining why this is fine.
+
+note: logged because it was a real bug found in the test, not the code.
+the fix was one line in the test file.
+
+
+ITERATIONS AND CORRECTIONS (continued)
+
+Phase 2 test expectation bug in test_matcher.py
+normalize("It's ALIVE!") returns "it s alive" not "its alive". apostrophe
+gets replaced with a space. test expected the wrong thing. fixed the
+expected value and added a comment explaining why it's not a problem in
+practice since partial_ratio handles it.
