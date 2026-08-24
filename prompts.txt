@@ -159,3 +159,51 @@ normalize("It's ALIVE!") returns "it s alive" not "its alive". apostrophe
 gets replaced with a space. test expected the wrong thing. fixed the
 expected value and added a comment explaining why it's not a problem in
 practice since partial_ratio handles it.
+
+
+PHASE 3 - OCR
+
+Prompt 3.1
+
+what I typed:
+yes continue
+
+cleaner version:
+implement Phase 3. build ocr.py using PaddleOCR as the primary engine.
+keep a single instance alive so the model only loads once. run_ocr() should
+return (text, confidence) and return ("", 0.0) on empty frames rather than
+raising an error. verify against a synthetic frame with known text and a
+blank frame. update requirements.txt to reflect the actual working versions.
+
+note: "yes continue" was the whole message.
+
+
+Discovery during Phase 3 - PaddleOCR 3.7.0 crashes on Windows CPU
+
+what I typed:
+nothing - found while probing the new API
+
+what happened:
+pip installed PaddleOCR 3.7.0 and paddlepaddle 3.3.1 (the latest versions)
+instead of the 2.7.x line that requirements.txt meant to specify. three
+problems with 3.7.0:
+  1. ocr() is deprecated, replaced by predict()
+  2. the cls=True argument is no longer accepted
+  3. at inference time the paddle static runner crashes with
+     NotImplementedError from the oneDNN instruction backend on Windows CPU
+
+the error comes from pir::ArrayAttribute in the oneDNN instruction handler
+which is not implemented on Windows. this is a known instability in
+paddlepaddle 3.x on CPU-only Windows environments.
+
+fix: pin to paddleocr==2.7.3 + paddlepaddle==2.6.2 which is the stable,
+tested combination. the original requirements.txt had paddleocr>=2.7.0 which
+was meant to target the 2.x line - updated to use exact pins with a comment
+explaining why. ocr.py uses the 2.7.x API (ocr() method with cls=True and
+the old result format). this is not a design change - it's the version that
+actually works.
+
+note: this is an important environment finding. logged it so it is visible
+and explainable. the decision to pin rather than work around 3.x is justified
+because the 3.x crash is at the inference engine level, not something fixable
+in application code.

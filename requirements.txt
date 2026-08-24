@@ -13,8 +13,11 @@ imageio-ffmpeg>=0.4.9
 faster-whisper>=1.0.0
 
 # OCR - visual text detection (primary engine)
-paddleocr>=2.7.0
-paddlepaddle>=2.6.0
+# Pinned to 2.7.x: PaddleOCR 3.x has breaking API changes and crashes on
+# Windows CPU due to a PIR executor + oneDNN incompatibility in paddlepaddle 3.x.
+# 2.7.3 + 2.6.2 is the stable, tested combination on CPU-only environments.
+paddleocr==2.7.3
+paddlepaddle==2.6.2
 
 # Text matching
 rapidfuzz>=3.6.0
@@ -25,6 +28,3 @@ rapidfuzz>=3.6.0
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
-
-# Optional but useful for generating synthetic test fixtures
-# opencv-python-headless already covers this
