@@ -207,3 +207,23 @@ note: this is an important environment finding. logged it so it is visible
 and explainable. the decision to pin rather than work around 3.x is justified
 because the 3.x crash is at the inference engine level, not something fixable
 in application code.
+
+
+PHASE 4 - FRAME SEARCH
+
+Prompt 4.1
+
+what I typed:
+continue
+also use only necessary tokens - need to complete this project with
+tokens i have but follow all instructions
+
+cleaner version:
+implement Phase 4. build frame_search.py with the coarse-to-fine algorithm:
+coarse scan at interval, bisection between last no-match and first coarse
+match, local sequential scan around the transition to handle OCR non-monotonicity,
+then a persistence check on consecutive frames. ocr_fn must be injectable so
+tests can pass a fake without any real video or model. write tests covering
+local scan, persistence, and search_frames. be token-efficient going forward.
+
+note: user flagged token usage. keeping explanations short from here.
