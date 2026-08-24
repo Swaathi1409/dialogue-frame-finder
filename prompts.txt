@@ -1,81 +1,119 @@
+prompts.txt - log of how this project was built
+
+I'm keeping this as a running log of the prompts I gave, what I
+actually meant by them, and what changed along the way. Format is
+simple: what I typed, then a cleaner version of the same thing,
+then any notes about what came up.
+
+
 PHASE 0 - SETUP AND PLANNING
------------------------------
 
-[Refined Prompt 0.1 - Project Kickoff and Full Brief]
+Prompt 0.1
 
-Build a Python CLI tool called Dialogue Frame Finder. Given a video URL
-(including OK.ru) and a target dialogue line, find the first video frame
-where that line is visually visible as burned-in text on screen, and
-report: the frame as a PNG, the timestamp in seconds (from real fps),
-the frame number, the OCR-recognized text, and a confidence level with
-reasoning (High, Low, or Not Found).
+what I typed:
+pasted the full project brief - all 10 sections covering the goal,
+tech stack, algorithm, confidence model, file structure, docs, and
+phase plan. also added 8 extra constraints at the end about verifying
+the OK.ru URL early, not assuming OCR is monotonic, no Tesseract
+fallback unless tested, keeping algorithm logic in our own code, and
+doing a clean-clone check before submission.
 
-The approved technology stack is:
-  - yt-dlp for video download
-  - ffmpeg and OpenCV for frame extraction, using real fps from ffprobe
-  - faster-whisper (base/tiny model, word-level timestamps) for coarse ASR window
-  - PaddleOCR as primary OCR engine
-  - RapidFuzz partial_ratio for fuzzy text matching
-  - Python, pytest, Docker (CPU-only, no Compose)
+cleaner version:
+build a CLI tool that takes a video URL and a dialogue line, finds
+the first frame where that text is visually visible on screen, and
+returns the frame as a PNG plus timestamp, frame number, OCR text,
+and a confidence rating. use yt-dlp for download, faster-whisper for
+rough timing, PaddleOCR to read text from frames, and RapidFuzz to
+match it. all thresholds go in config.py, nothing scattered. start
+with Phase 0 only: folder structure, stubs, config, models, and
+requirements. no real logic yet. stop and show me what was created.
 
-The algorithm has four stages:
-  Stage 0: Download video
-  Stage 1: Coarse localization via ASR + fuzzy match to get search window
-  Stage 2: Fallback - full-video scan if ASR finds nothing
-  Stage 3: Coarse-to-fine frame search + bisection + persistence check
-  Stage 4: Report with confidence bucket (High/Low/Not Found)
-
-Confidence thresholds live in config.py only (no magic numbers elsewhere).
-Every module raises its own typed exception. main.py catches at top level.
-Project structure is fixed per the spec in Section 6. No extra files.
-
-Additional implementation constraints added:
-  1. Treat the architecture as baseline; stop and explain before changing
-     any major design decision due to implementation reality.
-  2. Verify the OK.ru URL early in Phase 1 before building the rest.
-  3. Frame search: include neighboring-frame verification and local
-     sequential check around the estimated transition.
-  4. No Tesseract fallback unless actually tested and providing recovery.
-  5. At each phase checkpoint: explain what was built, why, how to modify it,
-     what tests ran, the results, and any problems resolved.
-  6. Core algorithm logic (localization, matching, confidence, frame refinement,
-     persistence, not-found) must be visible in our own code.
-  7. Before final submission: clean-clone verification.
-  8. Final cross-check: every requirement marked PASS/PARTIAL/FAIL.
-
-Execute Phase 0 only: create folder structure with stubs, write config.py
-with all named constants, write models.py with dataclasses, write
-requirements.txt, and write stub files for every module from Section 6.
-Stop and show the structure before writing any pipeline logic.
-
-note: logged after cross-verification with the original request.
-The user's prompt was a complete project brief (Sections 0-10). The
-refined version above preserves the exact technical decisions, stack,
-algorithm stages, constraints, and behavioral rules, condensed to
-remove repetition. The intent is identical.
+note: Phase 0 brief was very long so the cleaner version keeps the
+intent but trims the repetition. the 8 extra constraints I added are
+all kept in the refined version, just condensed.
 
 
-[Refined Prompt 0.2 - Phase 0 Execution Approval]
+Prompt 0.2
 
-Create the project scaffold for Phase 0:
-  - All directories and stub files matching the structure in Section 6
-  - config.py with all thresholds, model sizes, and sampling rates as
-    named constants, with comments explaining each one
-  - models.py with TranscriptSegment, SearchWindow, FrameCandidate,
-    and FinderResult as plain dataclasses with no logic
-  - requirements.txt with pinned minimum versions for all dependencies
-  - Stub files for every module: each stub defines the public function
-    signatures and raises NotImplementedError, so the import graph is
-    valid from the start
-  - tests/ folder with stub test files and a fixtures/README.txt
-  - prompts.txt started as a living document
+what I typed:
+shall we push each phase by phase to github?
 
-Do not implement any pipeline logic in this phase.
+cleaner version:
+set up git so we commit after each phase. i'll handle pushing -
+just give me a short description and tell me when it's ready.
 
-note: logged after cross-verification with the original request.
-This prompt covers what was actually built in Phase 0.
+note: simple question. turned into a concrete workflow - assistant
+handles commits and gives a description, i push.
+
+
+PHASE 1 - VIDEO AND AUDIO ACQUISITION
+
+Prompt 1.1
+
+what I typed:
+yes ready for phase 1
+also for pushing in github - I can do - u just give few word
+description after completing each phase and tell ready for push
+
+cleaner version:
+start Phase 1. build downloader.py, audio.py, and frame_extractor.py.
+verify the OK.ru URL before doing anything else. if it fails, say why
+clearly. at the end give a short commit description and say ready for push.
+
+note: two lines from me. intent was clear so not much to refine here.
+
+
+Discovery during Phase 1 - OK.ru network check
+
+what I typed:
+nothing - this came up during implementation
+
+what happened:
+tried to connect to ok.ru and got a ConnectionResetError every time.
+YouTube worked fine from the same machine so the internet itself is fine.
+it's an IP-level block by OK.ru, not a bug in yt-dlp. the Odnoklassniki
+extractor is there and working. the pipeline raises DownloadError clearly
+when it can't connect. used a short YouTube video to test the same code
+paths since the download/audio/frame logic is identical regardless of site.
+
+note: logged this even though it wasn't a prompt because the spec says
+to log research and reasoning steps too.
+
+
+Discovery during Phase 1 - ffmpeg binary name issue
+
+what I typed:
+nothing - hit this bug while wiring yt-dlp
+
+what happened:
+yt-dlp needs ffmpeg to merge separate video and audio streams (which is
+how OK.ru and YouTube both work). imageio_ffmpeg bundles the binary but
+names it with the platform and version like ffmpeg-win-x86_64-v7.1.exe.
+yt-dlp looks for a file named exactly ffmpeg or ffmpeg.exe and does not
+find the versioned name. fixed by copying the bundled binary to a temp
+folder with the plain name once per process. added _get_ffmpeg_dir() in
+downloader.py to handle this.
+
+note: design change from the original plan so logging it here.
 
 
 ITERATIONS AND CORRECTIONS
----------------------------
-(none yet - Phase 0 is the first phase)
+
+ffprobe replaced by OpenCV for video info
+the spec said "real fps via ffprobe" but ffprobe is not included in the
+imageio_ffmpeg package, only ffmpeg is. rather than add another dependency,
+i used OpenCV's VideoCapture to read fps, frame count, duration and
+resolution. it uses the same underlying library as ffprobe so the values
+are the same. the only real limitation is variable frame rate video, which
+OK.ru content is not. documented this in frame_extractor.py.
+
+imageio-ffmpeg added to requirements.txt
+the original requirements assumed ffmpeg would be on the system PATH.
+it wasn't in this environment. imageio_ffmpeg bundles the binary so users
+don't have to install ffmpeg themselves. added it to requirements.txt.
+
+ffmpeg_location bug in downloader.py
+first attempt passed the imageio_ffmpeg binary folder to yt-dlp as
+ffmpeg_location. yt-dlp looks for the name ffmpeg.exe in that folder and
+doesn't find the versioned filename. fixed by copying to a temp dir under
+the plain name. see the Phase 1 discovery entry above.

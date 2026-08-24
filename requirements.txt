@@ -5,6 +5,10 @@ yt-dlp>=2024.1.1
 opencv-python-headless>=4.9.0
 numpy>=1.24.0
 
+# Bundled ffmpeg binary (so ffmpeg does not need to be on system PATH)
+# imageio-ffmpeg ships the actual ffmpeg executable for the current platform.
+imageio-ffmpeg>=0.4.9
+
 # ASR - coarse temporal localization
 faster-whisper>=1.0.0
 
