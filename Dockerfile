@@ -80,7 +80,8 @@ RUN mkdir -p output
 # Default: run the CLI.
 # Pass "web" as first argument to start the Flask web server instead.
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 5000
 
