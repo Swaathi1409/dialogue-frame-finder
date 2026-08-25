@@ -601,3 +601,28 @@ what happened:
 - identified dialogue_finder/cli.py:L32-L33 for the Command Line arguments.
 - explained how both methods pass the inputs to the main pipeline.
 - appended this prompt log to prompts.txt.
+
+Prompt - OK.ru download issue
+
+what I typed:
+what is the problem with ok.ru downloading with url
+
+cleaner version:
+why does downloading ok.ru videos via URL fail on my machine?
+
+interpretation:
+user is asking for a technical explanation of the ConnectionResetError they see
+when trying to download ok.ru links. I need to explain the TLS/JA3 fingerprinting
+issue that ok.ru uses to block automated scripts, how the code attempts to work
+around it, and why it still fails on their specific IP.
+
+what happened:
+- explained that OK.ru actively blocks Python's default SSL/TLS fingerprint (JA3).
+- explained that when yt-dlp makes a request, OK.ru sees it's a bot and cuts
+  the connection (ConnectionResetError 10054).
+- explained that the fallback (okrudownloader.top) successfully bypasses the
+  metadata block, but the actual CDN video links it returns are IP-bound and
+  sometimes still get blocked by the CDN.
+- noted that this is a network-level security measure by ok.ru, not a bug in
+  the codebase.
+- appended this prompt to prompts.txt.
