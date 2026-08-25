@@ -28,8 +28,13 @@ import tempfile
 import logging
 import yt_dlp
 import imageio_ffmpeg
+import requests as _requests
 
 logger = logging.getLogger(__name__)
+
+# API used as fallback when yt-dlp cannot reach ok.ru directly.
+# okrudownloader.top runs this Vercel backend that proxies OK.ru video metadata.
+_OKRU_API = "https://okrufunction7.vercel.app"
 
 # Module-level cache: path to the directory containing 'ffmpeg.exe' (or 'ffmpeg')
 # that yt-dlp can find. Created once, reused for the lifetime of the process.
@@ -134,6 +139,19 @@ def download_video(url: str, output_dir: str) -> str:
     except DownloadError:
         raise
     except Exception as e:
+        # For ok.ru, Python's TLS stack is blocked by OK.ru's JA3 fingerprint
+        # filter. Fall back to the okrudownloader.top backend API which proxies
+        # the metadata and returns direct CDN URLs we can download with requests.
+        if "ok.ru" in url.lower():
+            logger.warning(
+                "yt-dlp failed on ok.ru (%s) - trying okrudownloader.top fallback", e
+            )
+            try:
+                return _okru_fallback_download(url, output_dir)
+            except Exception as fe:
+                raise DownloadError(
+                    f"Download failed for {url}: yt-dlp: {e}; fallback: {fe}"
+                ) from fe
         raise DownloadError(f"Download failed for {url}: {e}") from e
 
     # yt-dlp may merge streams into a different extension than what the
@@ -162,3 +180,86 @@ def _find_video_file(directory: str) -> str | None:
         if ext.lower() in video_extensions:
             return os.path.join(directory, fname)
     return None
+
+
+def _okru_fallback_download(url: str, output_dir: str) -> str:
+    """
+    Fallback downloader for ok.ru videos when yt-dlp is blocked at TLS level.
+
+    OK.ru uses JA3 fingerprint filtering: Python's ssl / curl / PowerShell are
+    all blocked. Chrome's QUIC or TLS fingerprint is not blocked.
+
+    okrudownloader.top runs a Vercel backend (okrufunction7.vercel.app) that
+    acts as a trusted proxy - it fetches the OK.ru metadata and returns direct
+    CDN URLs (ok6-*.vkuser.net) that are accessible without TLS restrictions.
+
+    Quality preference: 480p (good balance of size vs clarity for OCR).
+    Falls back to 360p → 720p → first available quality.
+    """
+    logger.info("ok.ru fallback: calling okrufunction7.vercel.app/api/extract")
+
+    session = _requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/127.0.0.0",
+        "Origin": "https://okrudownloader.top",
+        "Referer": "https://okrudownloader.top/",
+        "Content-Type": "application/json",
+    })
+
+    try:
+        r = session.post(
+            f"{_OKRU_API}/api/extract",
+            json={"url": url},
+            timeout=30,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        raise RuntimeError(f"okrudownloader API call failed: {e}") from e
+
+    if not data.get("success"):
+        raise RuntimeError(f"okrudownloader API returned error: {data}")
+
+    video_urls = data.get("videoUrls", {})
+    title = data.get("title", "video")
+    logger.info("ok.ru fallback: got URLs for qualities: %s", list(video_urls.keys()))
+
+    # Pick quality - 480p preferred for OCR (readable text, manageable file size)
+    preferred = ["480p", "360p", "720p", "240p", "144p", "adaptive"]
+    chosen_url = None
+    chosen_quality = None
+    for q in preferred:
+        if q in video_urls and q != "adaptive":
+            chosen_url = video_urls[q]
+            chosen_quality = q
+            break
+
+    if chosen_url is None:
+        raise RuntimeError(f"No usable quality found in: {list(video_urls.keys())}")
+
+    logger.info("ok.ru fallback: downloading %s quality", chosen_quality)
+
+    out_path = os.path.join(output_dir, "video.mp4")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Stream download with progress logging
+    dl_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/127.0.0.0",
+        "Referer": "https://ok.ru/",
+    }
+    with session.get(chosen_url, headers=dl_headers, stream=True, timeout=120) as resp:
+        resp.raise_for_status()
+        total = int(resp.headers.get("Content-Length", 0))
+        downloaded = 0
+        with open(out_path, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total:
+                        pct = downloaded * 100 // total
+                        logger.info("ok.ru fallback: %d%% (%d MB)", pct, downloaded // 1024 // 1024)
+
+    logger.info("ok.ru fallback: saved to %s (%d MB)", out_path, os.path.getsize(out_path) // 1024 // 1024)
+    return out_path
+

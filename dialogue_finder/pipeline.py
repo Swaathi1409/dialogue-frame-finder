@@ -1,6 +1,9 @@
 """
 pipeline.py - Orchestrates all pipeline stages end to end.
 
+Accepts either a URL (any yt-dlp-supported site) or a local file path.
+If the input is an existing local file, the download stage is skipped.
+
 run_pipeline() is the single function callers use. It:
   1. Downloads the video (downloader.py)
   2. Extracts 16kHz mono audio (audio.py)
@@ -63,10 +66,29 @@ def run_pipeline(
             shutil.rmtree(work_dir, ignore_errors=True)
 
 
+def _looks_like_file(path: str) -> bool:
+    """True if the input looks like a local file path rather than a URL."""
+    if path.startswith(("http://", "https://", "ftp://", "rtmp://")):
+        return False
+    # If it has a video extension or no scheme at all, treat as local
+    VIDEO_EXTS = (".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".ts", ".m4v")
+    return any(path.lower().endswith(e) for e in VIDEO_EXTS) or "://" not in path
+
+
 def _run(url, target, output_dir, work_dir):
-    # 1. Download
-    logger.info("Stage 1: Downloading video from %s", url)
-    video_path = download_video(url, work_dir)
+    # 1. Download (skip if input is a local file path)
+    if _looks_like_file(url):
+        if not os.path.isfile(url):
+            raise FileNotFoundError(
+                f"Local file not found: '{url}'\n"
+                f"Tip: download the video first with:\n"
+                f"  yt-dlp \"<URL>\" -o \"{url}\""
+            )
+        logger.info("Stage 1: Using local file: %s", url)
+        video_path = url
+    else:
+        logger.info("Stage 1: Downloading video from %s", url)
+        video_path = download_video(url, work_dir)
     logger.info("Video: %s", video_path)
 
     # 2. Video metadata
@@ -75,15 +97,20 @@ def _run(url, target, output_dir, work_dir):
     logger.info("fps=%.4f  frames=%d  duration=%.1fs",
                 video_info.fps, video_info.total_frames, video_info.duration_sec)
 
-    # 3. Audio extraction
-    logger.info("Stage 3: Extracting audio")
-    audio_path = os.path.join(work_dir, "audio.wav")
-    extract_audio(video_path, audio_path)
+    # 3. Audio extraction + 4. ASR - both optional
+    # If the video has no audio track or transcription fails, we fall
+    # through to the full-video fallback scan. This is not an error.
+    segments = []
+    try:
+        logger.info("Stage 3: Extracting audio")
+        audio_path = os.path.join(work_dir, "audio.wav")
+        extract_audio(video_path, audio_path)
 
-    # 4. ASR transcription
-    logger.info("Stage 4: Transcribing audio with Whisper")
-    segments = transcribe(audio_path)
-    logger.info("%d segments transcribed", len(segments))
+        logger.info("Stage 4: Transcribing audio with Whisper")
+        segments = transcribe(audio_path)
+        logger.info("%d segments transcribed", len(segments))
+    except Exception as e:
+        logger.warning("Audio/ASR stage failed (%s) - using full-video fallback", e)
 
     # 5. Localization
     logger.info("Stage 5: Finding search window")
@@ -93,11 +120,48 @@ def _run(url, target, output_dir, work_dir):
         window = fallback_window(video_info.duration_sec)
     logger.info("Search window: %.1f-%.1fs (source=%s)", window.start_sec, window.end_sec, window.source)
 
-    # 6. Frame search
+    # 6. Frame search (OCR-based)
     logger.info("Stage 6: Scanning frames with OCR")
     candidate = search_frames(video_path, video_info, window, target, run_ocr)
 
     if candidate is None:
+        # OCR found no on-screen text matching the target.
+        # If ASR matched strongly, the dialogue is spoken on screen (no burned-in
+        # subtitles). Return the frame at the midpoint of the ASR segment.
+        # This is the correct answer for "on-screen dialogue" = spoken by a
+        # character visible in the frame.
+        if (
+            window.source == "asr"
+            and window.asr_segment is not None
+            and window.asr_score >= config.ASR_MATCH_THRESHOLD
+        ):
+            seg = window.asr_segment
+            mid_sec = (seg.start_sec + seg.end_sec) / 2.0
+            frame_number = int(mid_sec * video_info.fps)
+            logger.info(
+                "OCR found nothing - using ASR segment midpoint frame %d (%.1fs)",
+                frame_number, mid_sec,
+            )
+            frame_img = extract_frame(video_path, frame_number)
+            os.makedirs(output_dir, exist_ok=True)
+            frame_path = os.path.join(output_dir, f"frame_{frame_number}.png")
+            save_frame(frame_img, frame_path)
+            return FinderResult(
+                found=True,
+                confidence="Low",
+                reasoning=(
+                    f"no on-screen text found by OCR, but ASR matched the spoken "
+                    f"dialogue at {seg.start_sec:.1f}-{seg.end_sec:.1f}s "
+                    f"(score {window.asr_score:.0f}/100). "
+                    f"Frame is at the midpoint of the spoken segment."
+                ),
+                frame_number=frame_number,
+                timestamp_sec=mid_sec,
+                ocr_text=seg.text.strip(),
+                frame_image_path=frame_path,
+                match_score=window.asr_score,
+            )
+
         label, reasoning = confidence_bucket(0.0, False)
         return FinderResult(found=False, confidence=label, reasoning=reasoning)
 
@@ -121,3 +185,4 @@ def _run(url, target, output_dir, work_dir):
         frame_image_path=frame_path,
         match_score=candidate.match_score,
     )
+

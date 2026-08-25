@@ -89,6 +89,7 @@ def find_asr_window(
         end_sec=end,
         source="asr",
         asr_score=best_score,
+        asr_segment=best_segment,
     )
 
 

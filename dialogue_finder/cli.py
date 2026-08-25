@@ -66,6 +66,9 @@ def main(argv=None):
             output_dir=args.output_dir,
             work_dir=args.work_dir,
         )
+    except FileNotFoundError as e:
+        _error(str(e), args.as_json)
+        return 1
     except DownloadError as e:
         _error(f"Download failed: {e}", args.as_json)
         return 1
@@ -89,6 +92,7 @@ def main(argv=None):
             "reasoning": result.reasoning,
             "frame_number": result.frame_number,
             "timestamp_sec": result.timestamp_sec,
+            "timestamp_hms": _fmt_ts(result.timestamp_sec) if result.timestamp_sec is not None else None,
             "ocr_text": result.ocr_text,
             "frame_image_path": result.frame_image_path,
             "match_score": result.match_score,
@@ -99,21 +103,29 @@ def main(argv=None):
     return 0 if result.found else 1
 
 
+def _fmt_ts(sec: float) -> str:
+    """Convert seconds to HH:MM:SS.sss"""
+    h = int(sec // 3600)
+    m = int((sec % 3600) // 60)
+    s = sec % 60
+    return f"{h:02d}:{m:02d}:{s:06.3f}"
+
+
 def _print_human(result):
     if not result.found:
-        print(f"\nResult: NOT FOUND")
-        print(f"Confidence: {result.confidence}")
-        print(f"Reason: {result.reasoning}")
+        print(f"\nNot Found")
+        print(f"Confidence : {result.confidence}")
+        print(f"Reason     : {result.reasoning}")
         return
 
-    print(f"\nResult: FOUND")
-    print(f"  Frame:       {result.frame_number}")
-    print(f"  Timestamp:   {result.timestamp_sec:.3f} sec")
-    print(f"  Match score: {result.match_score:.1f}/100")
-    print(f"  Confidence:  {result.confidence}")
-    print(f"  OCR text:    {result.ocr_text}")
-    print(f"  Frame PNG:   {result.frame_image_path}")
-    print(f"  Reason:      {result.reasoning}")
+    print(f"\nTimestamp : {_fmt_ts(result.timestamp_sec)}")
+    print(f"Frame     : {result.frame_number}")
+    print(f"Text      : \"{result.ocr_text}\"")
+    print(f"Image     : {result.frame_image_path}")
+    print(f"")
+    print(f"Match score : {result.match_score:.1f}/100")
+    print(f"Confidence  : {result.confidence}")
+    print(f"Reason      : {result.reasoning}")
 
 
 def _error(msg, as_json):

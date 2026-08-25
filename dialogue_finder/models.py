@@ -22,11 +22,15 @@ class SearchWindow:
     """
     The time range (in seconds) that the frame searcher will scan.
     source says where this window came from: 'asr' or 'fallback'.
+    asr_segment holds the best-matching transcript segment so the pipeline
+    can fall back to an ASR-only result when OCR finds no on-screen text
+    (e.g. spoken dialogue with no burned-in subtitles).
     """
     start_sec: float
     end_sec: float
     source: str          # 'asr' or 'fallback'
     asr_score: float = 0.0   # fuzzy match score that produced this window (0 if fallback)
+    asr_segment: Optional["TranscriptSegment"] = None  # best-matching ASR segment
 
 
 @dataclass

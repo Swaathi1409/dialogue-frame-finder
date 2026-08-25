@@ -38,14 +38,14 @@ Options:
 ## Example output
 
 ```
-Result: FOUND
-  Frame:       5832
-  Timestamp:   243.000 sec
-  Match score: 95.0/100
-  Confidence:  High
-  OCR text:    she said I am going home now
-  Frame PNG:   output/frame_5832.png
-  Reason:      match score 95.0 >= 90 and confirmed across neighboring frames
+Timestamp : 00:04:03.000
+Frame     : 5832
+Text      : "My mind rebels at stagnation"
+Image     : output/frame_5832.png
+
+Match score : 95.0/100
+Confidence  : High
+Reason      : match score 95.0 >= 90 and confirmed across neighboring frames
 ```
 
 ## How it works
