@@ -26,6 +26,7 @@ import os
 import shutil
 import tempfile
 import logging
+import re
 import yt_dlp
 import imageio_ffmpeg
 import requests as _requests
@@ -111,8 +112,9 @@ def download_video(url: str, output_dir: str) -> str:
         "no_warnings": False,
         "logger": logging.getLogger("yt_dlp"),
         # Retries: fail fast rather than hanging for minutes on a bad URL.
-        "retries": 2,
-        "fragment_retries": 2,
+        # Retries: fail fast rather than hanging for minutes on a bad URL.
+        "retries": 1,
+        "fragment_retries": 1,
     }
 
     # Auto-detect cookies.txt in the project root for YouTube bot-detection bypass.
@@ -296,27 +298,35 @@ def _playwright_download_fallback(url: str, output_dir: str) -> str:
 
         def handle_response(response):
             nonlocal video_url
-            # OK.ru video chunks or streams usually come from vkuser.net CDNs
-            if "vkuser.net" in response.url and (".mp4" in response.url or "/video/" in response.url):
-                # Ignore tiny chunks or manifest files, look for the actual stream
+            if "vkuser.net" in response.url:
                 if response.request.method == "GET" and response.status in (200, 206):
-                    video_url = response.url
+                    # Check that it's actually serving video content, since the URL itself 
+                    # doesn't contain .mp4 or /video/
+                    if "video" in response.headers.get("content-type", "").lower():
+                        # The CDN often serves video using HTTP Range Requests for DASH chunking,
+                        # appending '&bytes=0-3503' to the URL. If we download that URL as-is, we
+                        # only get the tiny moov atom / init chunk. We must strip the bytes 
+                        # parameter to download the full monolithic video stream.
+                        video_url = re.sub(r"&bytes=\d+-\d+", "", response.url)
 
         page.on("response", handle_response)
 
         try:
             logger.info("Playwright: Navigating to %s", url)
-            page.goto(url, timeout=config.PLAYWRIGHT_TIMEOUT_MS)
-            
-            # Wait for the video player to load and trigger the stream request
-            logger.info("Playwright: Waiting for video stream request...")
-            page.wait_for_selector("video", timeout=15000)
-            
-            # Force play if needed to trigger the network request
-            page.evaluate("() => { const v = document.querySelector('video'); if (v) v.play(); }")
-            
-            # Wait a few seconds for our response interceptor to catch the URL
-            page.wait_for_timeout(3000)
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=config.PLAYWRIGHT_TIMEOUT_MS)
+                
+                # Wait for the video player to load and trigger the stream request
+                logger.info("Playwright: Waiting for video stream request...")
+                page.wait_for_selector("video", timeout=15000)
+                
+                # Force play if needed to trigger the network request
+                page.evaluate("() => { const v = document.querySelector('video'); if (v) v.play(); }")
+                
+                # Wait a few seconds for our response interceptor to catch the URL
+                page.wait_for_timeout(3000)
+            except Exception as nav_err:
+                logger.debug("Playwright: Navigation/Selector timed out (this is OK if URL was already intercepted): %s", nav_err)
 
             if not video_url:
                 # If network interception failed, try extracting from the video tag src
@@ -331,8 +341,9 @@ def _playwright_download_fallback(url: str, output_dir: str) -> str:
             
             # Important: Download using the browser context to preserve the trusted TLS fingerprint
             # and any session cookies/tokens that OK.ru's CDN expects.
+            # Timeout is increased to 10 minutes (600000ms) to allow large video downloads to finish.
             api_request_context = context.request
-            response = api_request_context.get(video_url, timeout=config.PLAYWRIGHT_TIMEOUT_MS)
+            response = api_request_context.get(video_url, timeout=600000)
             
             if not response.ok:
                 raise RuntimeError(f"CDN download returned HTTP {response.status}")
@@ -342,6 +353,11 @@ def _playwright_download_fallback(url: str, output_dir: str) -> str:
                 f.write(response.body())
                 
             logger.info("Playwright: Download complete: %s", out_path)
+            logger.warning(
+                "NOTE: Playwright fallback downloads a raw browser CDN chunk which often "
+                "lacks an audio track and is low resolution (e.g. 144p-240p). "
+                "This may cause the pipeline to fall back to a full-video scan and OCR may struggle to read pixelated text."
+            )
             return out_path
 
         except Exception as e:
@@ -363,13 +379,16 @@ def _playwright_download_fallback(url: str, output_dir: str) -> str:
             
             try:
                 logger.info("Playwright (Headed): Navigating to %s", url)
-                page.goto(url, timeout=config.PLAYWRIGHT_TIMEOUT_MS)
-                
-                logger.info("Playwright (Headed): Waiting for video stream request...")
-                page.wait_for_selector("video", timeout=15000)
-                
-                page.evaluate("() => { const v = document.querySelector('video'); if (v) v.play(); }")
-                page.wait_for_timeout(3000)
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=config.PLAYWRIGHT_TIMEOUT_MS)
+                    
+                    logger.info("Playwright (Headed): Waiting for video stream request...")
+                    page.wait_for_selector("video", timeout=15000)
+                    
+                    page.evaluate("() => { const v = document.querySelector('video'); if (v) v.play(); }")
+                    page.wait_for_timeout(3000)
+                except Exception as nav_err:
+                    logger.debug("Playwright (Headed): Navigation/Selector timed out (this is OK if URL was already intercepted): %s", nav_err)
 
                 if not video_url:
                     src = page.evaluate("() => { const v = document.querySelector('video'); return v ? v.src : null; }")
@@ -381,7 +400,7 @@ def _playwright_download_fallback(url: str, output_dir: str) -> str:
 
                 logger.info("Playwright (Headed): Found CDN URL, starting download...")
                 api_request_context = context.request
-                response = api_request_context.get(video_url, timeout=config.PLAYWRIGHT_TIMEOUT_MS)
+                response = api_request_context.get(video_url, timeout=600000)
                 
                 if not response.ok:
                     raise RuntimeError(f"CDN download returned HTTP {response.status}")
@@ -390,6 +409,11 @@ def _playwright_download_fallback(url: str, output_dir: str) -> str:
                     f.write(response.body())
                     
                 logger.info("Playwright (Headed): Download complete: %s", out_path)
+                logger.warning(
+                    "NOTE: Playwright fallback downloads a raw browser CDN chunk which often "
+                    "lacks an audio track and is low resolution (e.g. 144p-240p). "
+                    "This may cause the pipeline to fall back to a full-video scan and OCR may struggle to read pixelated text."
+                )
                 return out_path
             except Exception as headed_e:
                 logger.error("Playwright headed fallback also failed: %s", headed_e)
