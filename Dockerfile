@@ -76,13 +76,10 @@ COPY . .
 # The CLI and web UI write frame PNGs here. Mount a volume to persist them.
 RUN mkdir -p output
 
-# ------- Entrypoint -------
-# Default: run the CLI.
-# Pass "web" as first argument to start the Flask web server instead.
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
-    sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
-
+# ------- Execution -------
+# By default, start the Flask web server.
+# It listens on 0.0.0.0 so it is reachable outside the container.
+ENV FLASK_HOST=0.0.0.0
 EXPOSE 5000
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["python", "app.py"]

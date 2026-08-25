@@ -3,7 +3,6 @@ services:
     name: dialogue-frame-finder
     env: docker
     dockerfilePath: ./Dockerfile
-    dockerCommand: "web"
     plan: free
     healthCheckPath: /
     envVars:
