@@ -74,3 +74,11 @@ PADDLE_DET_DB_BOX_THRESH = 0.3
 
 # drop_score: detections below this PaddleOCR confidence are ignored.
 PADDLE_DROP_SCORE = 0.3
+
+# ---------- Playwright Fallback settings ----------
+
+# Domains that trigger the Playwright fallback if yt-dlp fails.
+PLAYWRIGHT_FALLBACK_DOMAINS = ["ok.ru"]
+
+# Timeout for Playwright operations in milliseconds.
+PLAYWRIGHT_TIMEOUT_MS = 60000

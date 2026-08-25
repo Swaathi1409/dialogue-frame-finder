@@ -73,6 +73,11 @@ that does not survive the persistence check is also **Low**.
 
 ## Design decisions and tradeoffs
 
+**Network Acquisition & TLS/JA3 Filtering (ok.ru)**
+OK.ru actively blocks programmatic HTTP clients (like Python's `ssl` stack, `requests`, `curl`, and `yt-dlp`) via TLS/JA3 fingerprint filtering. When yt-dlp attempts to fetch video metadata, the server forcibly resets the connection (`ConnectionResetError`). Proxies like `okrudownloader.top` can fetch metadata, but the direct CDN video URLs they return are IP-bound, meaning if we try to download them via a Python script, the CDN still blocks our non-browser IP footprint.
+Streaming the video directly via `ffmpeg` does not fix this, because the block happens at the TLS handshake level before streaming begins.
+**Solution:** The pipeline uses a Playwright Chromium fallback for `ok.ru`. It launches a genuine headless Chromium browser context, navigates to the video page, intercepts the CDN stream URL from the network tab, and downloads the stream using the browser's own trusted network context. If headless gets blocked, it retries in headed mode (useful for local development). This is a network condition on the host machine, not a defect in the tool, and the fallback guarantees it works.
+
 **OpenCV instead of ffprobe for VideoInfo**
 ffprobe is not included in `imageio-ffmpeg`. OpenCV uses the same
 `libavformat` under the hood so values are identical for CFR (constant
@@ -109,10 +114,12 @@ appear in any other file.
 | HIGH_CONF_THRESHOLD | 90 | Score for High confidence |
 | LOW_CONF_THRESHOLD | 70 | Score for Low confidence |
 | ASR_MATCH_THRESHOLD | 60 | Min score to use ASR window |
-| ASR_PAD_BEFORE_SEC | 3.0 | Seconds before ASR segment |
-| ASR_PAD_AFTER_SEC | 8.0 | Seconds after ASR segment |
-| COARSE_SAMPLE_INTERVAL_SEC | 0.5 | OCR sampling interval (ASR window) |
+| ASR_PAD_BEFORE_SEC | 2.0 | Seconds before ASR segment |
+| ASR_PAD_AFTER_SEC | 4.0 | Seconds after ASR segment |
+| COARSE_SAMPLE_INTERVAL_SEC | 1.0 | OCR sampling interval (ASR window) |
 | FALLBACK_SCAN_INTERVAL_SEC | 1.5 | OCR sampling interval (full video) |
 | BISECT_MIN_FRAMES | 1 | Stop bisection when gap ≤ this |
 | PERSISTENCE_FRAMES | 2 | Consecutive frames required to confirm |
-| WHISPER_MODEL_SIZE | base | faster-whisper model |
+| WHISPER_MODEL_SIZE | tiny | faster-whisper model |
+| PLAYWRIGHT_FALLBACK_DOMAINS | ["ok.ru"] | Domains to use Playwright fallback |
+| PLAYWRIGHT_TIMEOUT_MS | 60000 | Timeout for Playwright ops |

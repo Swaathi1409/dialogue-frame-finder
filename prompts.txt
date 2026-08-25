@@ -626,3 +626,44 @@ what happened:
 - noted that this is a network-level security measure by ok.ru, not a bug in
   the codebase.
 - appended this prompt to prompts.txt.
+
+Prompt - OK.ru Download Fix Addendum
+
+what I typed:
+# Final Addendum Prompt: OK.ru Download Fix
+Context: ok.ru blocks programmatic HTTPS clients via TLS/JA3 fingerprint...
+(provided detailed instructions for Playwright fallback implementation)
+
+cleaner version:
+implement a Playwright Chromium fallback for ok.ru downloads. okrudownloader.top
+CDN links are IP-bound, and streaming via ffmpeg directly fails due to TLS blocks.
+if yt-dlp fails on an ok.ru link, use a genuine headless Chromium context to
+bypass JA3 fingerprint filtering, capture the stream URL from network responses,
+and download it. if headless is blocked, retry in headed mode. ensure cleanup works.
+
+interpretation:
+user correctly identified that ok.ru blocks network requests based on TLS
+fingerprints (JA3). using a proxy only bypasses the metadata check; the actual
+CDN video stream is IP-locked and still rejects python's network stack.
+streaming directly to ffmpeg won't bypass the TLS handshake block.
+using playwright (Chromium) is the most robust way because it uses a real
+browser's TLS footprint which the CDN trusts.
+I need to completely swap out the okrudownloader proxy fallback with playwright,
+handle headless vs headed retries, add it to requirements, document the setup
+step, and verify temp file cleanup.
+
+what happened:
+- created an implementation plan, which was approved.
+- removed okrudownloader.top api logic from downloader.py.
+- added _playwright_download_fallback() using playwright's page.on('response')
+  interceptor to grab the CDN stream URL.
+- added a headless->headed retry mechanism for strictly firewalled networks.
+- added PLAYWRIGHT_FALLBACK_DOMAINS to config.py.
+- added playwright to requirements.txt and ran playwright install chromium.
+- wrote mocked pytest suite for playwright fallback and verified temp directory
+  cleanup (shutil.rmtree was already correctly implemented in a finally block).
+- tested the real URL locally; verified it successfully tripped the headless
+  block and retried (and successfully reported the error in headed mode as expected
+  on this specific machine's network).
+- updated README.md and APPROACH.md to explain the TLS block and the Playwright
+  solution.

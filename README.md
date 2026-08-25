@@ -19,6 +19,7 @@ Given a video URL (OK.ru, YouTube, or any yt-dlp-supported site) and a target di
 
 ```bash
 pip install -r requirements.txt
+playwright install chromium
 ```
 
 Requires **Python 3.10+** and **Node.js** (for YouTube extraction).  
@@ -121,4 +122,8 @@ All 49 tests run without a real video or network access.
 
 ## OK.ru note
 
-OK.ru uses TLS fingerprint filtering that blocks Python's SSL stack from some IPs. The tool automatically falls back to the `okrudownloader.top` API to get direct CDN URLs. If the fallback also fails (IP-locked CDN URLs), download the video manually in Chrome and pass the local file path instead.
+OK.ru uses TLS/JA3 fingerprint filtering that actively blocks Python's SSL/network stack from most IPs, making standard `yt-dlp` fail.
+
+To bypass this network block, the tool automatically falls back to **Playwright**. It will launch a genuine headless Chromium instance, navigate to the video page, intercept the direct CDN stream URL, and download it using the browser's own trusted network context. If headless mode gets blocked by the firewall, it will automatically retry in a visible headed browser (for local testing).
+
+Because Playwright is used, you must run `playwright install chromium` once during setup.
