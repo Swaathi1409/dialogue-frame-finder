@@ -820,3 +820,20 @@ what happened:
 - added regression test: test_shared_prefix_word_does_not_false_positive.
 - all 56 tests pass.
 - Instagram test result: RUN and run-alone false positives are fixed. OCR found zero OCR matches in the video (PaddleOCR cannot read the animated/stylized Instagram text), so the pipeline correctly fell back to ASR-only midpoint result with Low confidence. This is expected OCR limitation behavior, not a matcher bug.
+
+PHASE 7 - DOCKERIZATION
+
+Prompt 7.1
+
+what I typed:
+shall we dockerize and deploy?
+
+cleaner version:
+build a Dockerfile and docker-entrypoint.sh for the project. the container should support both the CLI (python -m dialogue_finder URL 'dialogue') and the web UI (app.py on port 5000). bake the PaddleOCR and Whisper models in at build time so the container works offline. use python:3.11-slim base. no Compose needed. note any dependency on the Playwright Chromium browser.
+
+what happened:
+- wrote Dockerfile: python:3.11-slim base, installs ffmpeg/libgl1/libglib2.0-0/libgomp1 system deps, runs pip install -r requirements.txt, installs Playwright Chromium with --with-deps, bakes Whisper tiny and PaddleOCR English models at build time, copies code last so model layers are cached.
+- wrote docker-entrypoint.sh: if first arg is 'web', sets FLASK_HOST=0.0.0.0 and starts app.py; otherwise passes all args to python -m dialogue_finder.
+- updated app.py to read FLASK_HOST and FLASK_PORT from environment variables (defaults to 127.0.0.1:5000 for local dev).
+- added flask>=3.0.0 to requirements.txt since app.py depends on it.
+- Docker Desktop Linux engine was not running on the test machine (npipe error). requires starting Docker Desktop manually before building.
