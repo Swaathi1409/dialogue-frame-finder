@@ -109,9 +109,6 @@ def download_video(url: str, output_dir: str) -> str:
         "quiet": True,
         "no_warnings": False,
         "logger": logging.getLogger("yt_dlp"),
-        # Use Node.js JS runtime so yt-dlp can handle YouTube's player challenge.
-        # Python API expects {"node": {}} not the string "node".
-        "js_runtimes": {"node": {}},
         # Retries: fail fast rather than hanging for minutes on a bad URL.
         "retries": 2,
         "fragment_retries": 2,
