@@ -645,17 +645,22 @@
          </div>`
       : '';
 
+    const frameHtml = result.has_image
+      ? `<img id="frameImg"
+              src="/api/frame/${jobId}?t=${Date.now()}"
+              alt="Captured frame"
+              style="width:100%;height:100%;object-fit:contain;display:block;"
+              onerror="this.style.display='none';document.querySelector('#frameBox .frame-placeholder').style.display='flex';" />`
+      : '';
+
     body.innerHTML = `
       <div class="result-layout">
 
         <div>
           <div class="frame-container" id="frameBox">
-            <div class="frame-placeholder">
-              <span>🎞️</span>
-              <p style="font-size:12px;">Loading frame…</p>
-            </div>
-            <img id="frameImg" alt="Captured frame" />
-            <div class="frame-label" id="frameLabel">Frame ${result.frame ?? '—'}</div>
+            ${result.has_image ? '' : '<div class="frame-placeholder"><span>🎞️</span><p style="font-size:12px;">No frame image</p></div>'}
+            ${frameHtml}
+            <div class="frame-label" style="${result.has_image ? 'display:block' : 'display:none'}">Frame ${result.frame ?? '—'}</div>
           </div>
         </div>
 
@@ -692,24 +697,6 @@
 
         </div>
       </div>`;
-
-    // Load frame image
-    if (result.has_image) {
-      const img = document.getElementById('frameImg');
-      const placeholder = document.querySelector('#frameBox .frame-placeholder');
-      img.onload = () => {
-        if (placeholder) placeholder.style.display = 'none';
-        img.style.display = 'block';
-        const lbl = document.getElementById('frameLabel');
-        if (lbl) lbl.style.display = 'block';
-      };
-      img.onerror = () => {
-        if (placeholder) placeholder.innerHTML =
-          '<span>🖼️</span><p style="font-size:12px;">Image unavailable</p>';
-      };
-      // Set src after handlers are attached
-      img.src = '/api/frame/' + jobId + '?t=' + Date.now();
-    }
 
     card.scrollIntoView({behavior: 'smooth', block: 'start'});
   }
