@@ -4,772 +4,476 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dialogue Frame Finder</title>
-  <meta name="description" content="Find the exact frame where a dialogue appears in any video using AI-powered speech recognition and OCR." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg:         #0d1117;
-      --surface:    #161b22;
-      --surface2:   #21262d;
-      --border:     #30363d;
-      --accent:     #2563eb;
-      --accent-dim: #1d4ed8;
-      --success:    #10b981;
-      --warn:       #f59e0b;
-      --danger:     #ef4444;
-      --text:       #e6edf3;
-      --muted:      #8b949e;
-      --radius:     10px;
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface2: #27272a;
+      --border: #3f3f46;
+      --accent: #3b82f6;
+      --success: #10b981;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --text: #f4f4f5;
+      --muted: #a1a1aa;
+      --radius: 8px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
-      height: 100%;
-      overflow: hidden; /* no page scroll */
+      height: 100vh;
+      overflow: hidden;
       font-family: 'Inter', sans-serif;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.5;
-    }
-
-    /* ─── App Shell: slim header + two-column body ───── */
-    .app-shell {
+      line-height: 1.4;
       display: flex;
       flex-direction: column;
-      height: 100vh;
     }
 
-    /* ─── Header ─────────────────────────────────────── */
-    header {
-      flex-shrink: 0;
-      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
-      border-bottom: 1px solid var(--border);
-      padding: 10px 24px;
+    /* ─── Top Navbar ─────────────────────────────────── */
+    .navbar {
       display: flex;
       align-items: center;
-      gap: 14px;
-      position: relative;
-      overflow: hidden;
+      gap: 20px;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
-    header::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse at 50% 0%, rgba(37,99,235,.2) 0%, transparent 70%);
-      pointer-events: none;
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
     }
-    .logo-icon {
-      width: 36px; height: 36px;
-      background: linear-gradient(135deg, var(--accent), #7c3aed);
-      border-radius: 8px;
+    .logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      border-radius: 6px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
+      font-size: 16px;
     }
-    .header-text { flex: 1; }
-    h1 {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-      background: linear-gradient(135deg, #fff 30%, #93c5fd);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      line-height: 1.2;
-    }
-    .header-sub {
-      color: var(--muted);
-      font-size: 11px;
-    }
-    .badge {
-      padding: 3px 10px;
-      background: rgba(37,99,235,.15);
-      border: 1px solid rgba(37,99,235,.35);
-      border-radius: 20px;
-      font-size: 11px;
-      color: #93c5fd;
-      letter-spacing: 0.4px;
-      flex-shrink: 0;
-    }
+    .brand h1 { font-size: 16px; font-weight: 700; color: #fff; }
 
-    /* ─── Two-column body ────────────────────────────── */
-    .body-columns {
+    .search-bar {
       flex: 1;
-      display: grid;
-      grid-template-columns: 380px 1fr;
-      overflow: hidden;
-    }
-
-    /* ─── Left column ────────────────────────────────── */
-    .left-col {
-      border-right: 1px solid var(--border);
       display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      align-items: center;
+      gap: 10px;
     }
-
-    /* ─── Right column ───────────────────────────────── */
-    .right-col {
+    .input-wrapper {
+      flex: 1;
       display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      gap: 10px;
     }
-
-    /* ─── Panels ─────────────────────────────────────── */
-    .panel {
-      padding: 16px 20px;
-    }
-    .panel + .panel {
-      border-top: 1px solid var(--border);
-    }
-    .panel-title {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--muted);
-      margin-bottom: 14px;
-    }
-
-    /* ─── Input form ──────────────────────────────────── */
-    .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
-    .form-group:last-of-type { margin-bottom: 0; }
-    label {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--muted);
-    }
-    input[type="text"], input[type="url"] {
+    input[type="url"], input[type="text"] {
+      flex: 1;
       background: var(--surface2);
       border: 1px solid var(--border);
-      border-radius: 7px;
-      padding: 9px 12px;
+      border-radius: var(--radius);
+      padding: 8px 12px;
       color: var(--text);
-      font-family: 'Inter', sans-serif;
       font-size: 13px;
       outline: none;
-      transition: border-color .2s, box-shadow .2s;
+      transition: border-color 0.2s;
     }
-    input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(37,99,235,.18);
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: #52525b; }
+
+    button {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: var(--accent);
+      border: none; border-radius: var(--radius);
+      padding: 0 20px; height: 35px;
+      color: #fff; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.2s;
+      white-space: nowrap;
     }
-    input::placeholder { color: #3d444d; }
-    .input-hint {
-      font-size: 10px;
-      color: #3d444d;
-    }
-    .btn-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
-    #analyzeBtn {
-      display: flex; align-items: center; gap: 7px;
-      background: linear-gradient(135deg, var(--accent), #7c3aed);
-      border: none; border-radius: 7px;
-      padding: 9px 20px;
-      color: #fff;
-      font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity .2s, transform .1s;
-    }
-    #analyzeBtn:hover { opacity: .9; }
-    #analyzeBtn:active { transform: scale(.98); }
-    #analyzeBtn:disabled { opacity: .45; cursor: not-allowed; }
-    #resetBtn {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      padding: 9px 16px;
-      color: var(--muted);
-      font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      cursor: pointer;
-      display: none;
-      transition: border-color .2s, color .2s;
-    }
-    #resetBtn:hover { border-color: var(--text); color: var(--text); }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-reset { background: transparent; border: 1px solid var(--border); color: var(--text); display: none; }
+    .btn-reset:hover { background: var(--surface2); }
+
     .spinner {
       width: 14px; height: 14px;
-      border: 2px solid rgba(255,255,255,.3);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      display: none;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite; display: none;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ─── Progress pipeline ───────────────────────────── */
-    #progressPanel { flex: 1; overflow-y: auto; }
-    .pipeline { display: flex; flex-direction: column; }
-    .pipe-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 10px 0;
-      position: relative;
+    /* ─── Main Layout ────────────────────────────────── */
+    .main-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      overflow: hidden; /* no main scroll */
     }
-    .pipe-step:not(:last-child)::after {
-      content: '';
-      position: absolute;
-      left: 14px; top: 38px;
-      width: 2px; height: calc(100% - 10px);
-      background: var(--border);
-      transition: background .4s;
-    }
-    .pipe-step.done:not(:last-child)::after { background: var(--success); }
-    .pipe-step.active:not(:last-child)::after { background: rgba(37,99,235,.4); }
-    .step-dot {
-      width: 30px; height: 30px; flex-shrink: 0;
-      border-radius: 50%;
-      background: var(--surface2);
-      border: 2px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px;
-      transition: border-color .3s, background .3s;
-    }
-    .pipe-step.active .step-dot {
-      border-color: var(--accent);
-      background: rgba(37,99,235,.15);
-      animation: pulse-dot 1.5s ease-in-out infinite;
-    }
-    .pipe-step.done .step-dot {
-      border-color: var(--success);
-      background: rgba(16,185,129,.15);
-    }
-    .pipe-step.error .step-dot {
-      border-color: var(--danger);
-      background: rgba(239,68,68,.15);
-    }
-    @keyframes pulse-dot {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,.4); }
-      50%       { box-shadow: 0 0 0 5px rgba(37,99,235,.0); }
-    }
-    .step-info { flex: 1; padding-top: 4px; }
-    .step-label {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--muted);
-      transition: color .3s;
-    }
-    .pipe-step.active .step-label { color: var(--text); }
-    .pipe-step.done .step-label  { color: var(--success); }
-    .pipe-step.error .step-label { color: var(--danger); }
-    .step-detail {
-      font-size: 11px;
-      color: #3d444d;
-      margin-top: 1px;
-      transition: color .3s;
-    }
-    .pipe-step.active .step-detail { color: var(--muted); }
 
-    /* ─── Error Banner ────────────────────────────────── */
+    /* ─── Sidebar (Progress) ─────────────────────────── */
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 16px;
+    }
+    .sidebar h2 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
     #errorBanner {
-      background: rgba(239,68,68,.1);
-      border: 1px solid rgba(239,68,68,.3);
-      border-radius: 7px;
-      padding: 10px 14px;
-      color: #f87171;
-      font-size: 12px;
-      margin-bottom: 12px;
-      display: none;
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+      border-radius: var(--radius); padding: 10px 12px; color: #fca5a5;
+      font-size: 12px; display: none;
     }
 
-    /* ─── Right panel: result ─────────────────────────── */
-    .right-panel {
-      flex: 1;
+    .pipeline { display: flex; flex-direction: column; gap: 4px; }
+    .step {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      background: transparent;
+      border: 1px solid transparent;
+      transition: all 0.3s;
+    }
+    .step.active {
+      background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3);
+    }
+    .step-icon {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--surface2); color: var(--muted);
+      display: flex; align-items: center; justify-content: center; font-size: 11px;
+    }
+    .step.done .step-icon { background: var(--success); color: #fff; }
+    .step.active .step-icon { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px rgba(59,130,246,0.2); }
+    .step.error .step-icon { background: var(--danger); color: #fff; }
+    
+    .step-text { flex: 1; display: flex; flex-direction: column; }
+    .step-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+    .step.active .step-title { color: var(--text); }
+    .step.done .step-title { color: var(--text); }
+    .step-desc { font-size: 11px; color: #71717a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+
+    /* ─── Result Area ────────────────────────────────── */
+    .result-area {
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-    }
-    .right-panel-title {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--muted);
-      padding: 14px 20px 12px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .result-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px 20px;
+      padding: 24px;
+      gap: 20px;
+      background: var(--bg);
+      overflow-y: auto; /* Allow scroll only inside result area if screen is extremely small */
     }
 
-    /* empty state */
     .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: var(--muted);
-      text-align: center;
-      gap: 10px;
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 14px; gap: 12px;
     }
-    .empty-state .es-icon { font-size: 42px; opacity: .35; }
-    .empty-state p { font-size: 13px; color: #3d444d; max-width: 280px; }
 
-    /* result layout: frame top, stats below */
-    .result-frame-wrap {
-      border-radius: 8px;
-      overflow: hidden;
+    .result-content {
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+      height: 100%;
+    }
+
+    .frame-box {
+      flex: 1;
       background: #000;
       border: 1px solid var(--border);
-      aspect-ratio: 16/9;
+      border-radius: var(--radius);
       display: flex; align-items: center; justify-content: center;
       position: relative;
-      margin-bottom: 14px;
+      overflow: hidden;
+      min-height: 0; /* allows flexbox to shrink the image container */
     }
-    #frameImg {
-      width: 100%; height: 100%;
-      object-fit: contain;
-      display: none;
+    .frame-box img {
+      max-width: 100%; max-height: 100%; object-fit: contain;
     }
-    .frame-placeholder {
-      color: #3d444d;
-      text-align: center;
-      padding: 20px;
-    }
-    .frame-placeholder span { display: block; font-size: 28px; margin-bottom: 6px; }
     .frame-label {
-      position: absolute;
-      bottom: 8px; left: 8px;
-      background: rgba(0,0,0,.75);
-      padding: 2px 7px;
-      border-radius: 4px;
-      font-size: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      color: #fff;
-      display: none;
+      position: absolute; bottom: 12px; left: 12px;
+      background: rgba(0,0,0,0.8); padding: 4px 10px; border-radius: 6px;
+      font-size: 11px; font-family: 'JetBrains Mono', monospace; color: #fff;
     }
 
-    /* result stats */
-    .conf-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 12px;
-    }
-    .conf-high { background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.4); color: #34d399; }
-    .conf-low  { background: rgba(245,158,11,.15);  border: 1px solid rgba(245,158,11,.4);  color: #fbbf24; }
-    .conf-none { background: rgba(239,68,68,.15);   border: 1px solid rgba(239,68,68,.4);   color: #f87171; }
-
-    .stats-grid {
+    .stats-panel {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 12px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      flex-shrink: 0;
     }
-    .stat-cell {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      padding: 10px 12px;
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px;
     }
-    .stat-cell label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; display: block; }
-    .stat-cell .val {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text);
-      margin-top: 2px;
-      word-break: break-all;
-    }
+    .stat-card label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 500; color: #fff; margin-top: 4px; }
+    
+    .conf-high { color: var(--success) !important; }
+    .conf-low { color: var(--warn) !important; }
+    .conf-none { color: var(--danger) !important; }
 
-    .extracted-text {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      border-radius: 7px;
-      padding: 10px 14px;
-      margin-bottom: 10px;
+    .details-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex-shrink: 0;
     }
-    .extracted-text label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 4px; }
-    .extracted-text p {
-      font-size: 13px;
-      color: var(--text);
-      font-style: italic;
-      line-height: 1.5;
+    .detail-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px;
     }
+    .detail-box label { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; display: block; }
+    .detail-box p { font-size: 12px; color: #d4d4d8; }
 
-    .reason-box {
-      background: rgba(37,99,235,.07);
-      border: 1px solid rgba(37,99,235,.2);
-      border-radius: 7px;
-      padding: 10px 12px;
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-    .reason-box strong { color: #93c5fd; }
-
-    /* not found */
-    .not-found-box {
-      text-align: center;
-      padding: 40px 20px;
-    }
-    .not-found-box .nf-icon { font-size: 36px; margin-bottom: 10px; }
-    .not-found-box h3 { font-size: 16px; color: var(--danger); margin-bottom: 6px; }
-    .not-found-box p { font-size: 12px; color: var(--muted); max-width: 320px; margin: 0 auto; }
-
-    /* fade-in */
-    .fade-in {
-      animation: fadeIn .35s ease forwards;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ─── Responsive fallback (narrow screens) ────────── */
-    @media (max-width: 720px) {
-      html, body { overflow: auto; }
-      .body-columns { grid-template-columns: 1fr; }
-      .left-col { border-right: none; border-bottom: 1px solid var(--border); }
-      .right-col { min-height: 400px; }
-    }
   </style>
 </head>
 <body>
 
-<div class="app-shell">
-
-  <!-- ── Header ── -->
-  <header>
-    <div class="logo-icon">🎬</div>
-    <div class="header-text">
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="logo">🎬</div>
       <h1>Dialogue Frame Finder</h1>
-      <p class="header-sub">Find the exact frame where a dialogue appears in any video</p>
     </div>
-    <span class="badge">ASR + OCR Pipeline</span>
+    <div class="search-bar">
+      <div class="input-wrapper">
+        <input type="url" id="videoUrl" placeholder="Video URL (e.g. YouTube, OK.ru)" autocomplete="off" />
+        <input type="text" id="dialogue" placeholder="Dialogue to search for..." autocomplete="off" />
+      </div>
+      <button id="analyzeBtn" onclick="startAnalysis()">
+        <span class="spinner" id="btnSpinner"></span>
+        <span id="btnText">Analyze</span>
+      </button>
+      <button id="resetBtn" class="btn-reset" onclick="reset()">Clear</button>
+    </div>
   </header>
 
-  <!-- ── Two-column body ── -->
-  <div class="body-columns">
-
-    <!-- ── Left: inputs + progress ── -->
-    <div class="left-col">
-
-      <!-- Input -->
-      <div class="panel">
-        <div class="panel-title">Analysis Input</div>
-        <div id="errorBanner"></div>
-        <div class="form-group">
-          <label for="videoUrl">Video URL</label>
-          <input type="url" id="videoUrl"
-                 placeholder="https://ok.ru/video/… or YouTube URL"
-                 autocomplete="off" spellcheck="false" />
-          <span class="input-hint">Supports OK.ru, YouTube, and most publicly accessible video links</span>
+  <!-- Main Layout -->
+  <div class="main-layout">
+    
+    <!-- Sidebar: Pipeline Progress -->
+    <aside class="sidebar">
+      <h2>Pipeline Status</h2>
+      <div id="errorBanner"></div>
+      
+      <div class="pipeline">
+        <div class="step" id="step-downloading">
+          <div class="step-icon">1</div>
+          <div class="step-text"><div class="step-title">Download</div><div class="step-desc">Waiting to start</div></div>
         </div>
-        <div class="form-group">
-          <label for="dialogue">Dialogue to Find</label>
-          <input type="text" id="dialogue"
-                 placeholder='e.g. "My mind rebels at stagnation"'
-                 autocomplete="off" />
-          <span class="input-hint">Partial match supported — enter any key phrase from the dialogue</span>
+        <div class="step" id="step-audio">
+          <div class="step-icon">2</div>
+          <div class="step-text"><div class="step-title">Audio Track</div><div class="step-desc">Waiting</div></div>
         </div>
-        <div class="btn-row">
-          <button id="analyzeBtn" onclick="startAnalysis()">
-            <span class="spinner" id="btnSpinner"></span>
-            <span id="btnText">▶ Analyze Video</span>
-          </button>
-          <button id="resetBtn" onclick="reset()">Reset</button>
+        <div class="step" id="step-transcribing">
+          <div class="step-icon">3</div>
+          <div class="step-text"><div class="step-title">Transcription</div><div class="step-desc">Waiting</div></div>
         </div>
-      </div>
-
-      <!-- Progress -->
-      <div class="panel" id="progressPanel" style="flex:1;overflow-y:auto;">
-        <div class="panel-title">Pipeline Progress</div>
-        <div class="pipeline" id="pipeline">
-          <div class="pipe-step" id="step-downloading">
-            <div class="step-dot">⬇️</div>
-            <div class="step-info">
-              <div class="step-label">Download</div>
-              <div class="step-detail">Fetching video from URL</div>
-            </div>
-          </div>
-          <div class="pipe-step" id="step-audio">
-            <div class="step-dot">🎵</div>
-            <div class="step-info">
-              <div class="step-label">Audio</div>
-              <div class="step-detail">Extracting audio track</div>
-            </div>
-          </div>
-          <div class="pipe-step" id="step-transcribing">
-            <div class="step-dot">🎤</div>
-            <div class="step-info">
-              <div class="step-label">Transcription</div>
-              <div class="step-detail">Running speech recognition (may take a minute)</div>
-            </div>
-          </div>
-          <div class="pipe-step" id="step-locating">
-            <div class="step-dot">🔍</div>
-            <div class="step-info">
-              <div class="step-label">Locate</div>
-              <div class="step-detail">Finding dialogue in transcript</div>
-            </div>
-          </div>
-          <div class="pipe-step" id="step-scanning">
-            <div class="step-dot">👁️</div>
-            <div class="step-info">
-              <div class="step-label">Frame Scan</div>
-              <div class="step-detail">Analyzing frames with OCR</div>
-            </div>
-          </div>
-          <div class="pipe-step" id="step-complete">
-            <div class="step-dot">✅</div>
-            <div class="step-info">
-              <div class="step-label">Complete</div>
-              <div class="step-detail">Result ready</div>
-            </div>
-          </div>
+        <div class="step" id="step-locating">
+          <div class="step-icon">4</div>
+          <div class="step-text"><div class="step-title">Locate Dialogue</div><div class="step-desc">Waiting</div></div>
+        </div>
+        <div class="step" id="step-scanning">
+          <div class="step-icon">5</div>
+          <div class="step-text"><div class="step-title">Frame Scan</div><div class="step-desc">Waiting</div></div>
+        </div>
+        <div class="step" id="step-complete">
+          <div class="step-icon">✓</div>
+          <div class="step-text"><div class="step-title">Complete</div><div class="step-desc">Result ready</div></div>
         </div>
       </div>
+    </aside>
 
-    </div><!-- /left-col -->
-
-    <!-- ── Right: result ── -->
-    <div class="right-col">
-      <div class="right-panel-title">Result</div>
-      <div class="result-body" id="resultBody">
-        <!-- empty state -->
-        <div class="empty-state" id="emptyState">
-          <div class="es-icon">🎞️</div>
-          <p>Enter a video URL and a dialogue line on the left, then click <strong>Analyze Video</strong> to find the exact frame.</p>
-        </div>
+    <!-- Result Area -->
+    <main class="result-area">
+      <div class="empty-state" id="emptyState">
+        <span style="font-size: 32px; opacity: 0.5;">🎞️</span>
+        <p>Enter a URL and dialogue in the top bar to begin.</p>
       </div>
-    </div>
 
-  </div><!-- /body-columns -->
-
-</div><!-- /app-shell -->
-
-<script>
-  let _currentSource = null;
-
-  // ── Stage ordering ──
-  const STAGE_ORDER = ['downloading','metadata','audio','transcribing','locating','scanning','complete'];
-
-  function setStage(stageId, message) {
-    const idx = STAGE_ORDER.indexOf(stageId);
-    if (idx === -1) return;
-    STAGE_ORDER.forEach((s, i) => {
-      const el = document.getElementById('step-' + s);
-      if (!el) return;
-      el.classList.remove('active','done','error');
-      if (i < idx)       el.classList.add('done');
-      else if (i === idx) el.classList.add('active');
-    });
-    const active = document.getElementById('step-' + stageId);
-    if (active && message) active.querySelector('.step-detail').textContent = message;
-  }
-
-  function startAnalysis() {
-    const url  = document.getElementById('videoUrl').value.trim();
-    const text = document.getElementById('dialogue').value.trim();
-    hideError();
-    if (!url || !text) { showError('Please enter both a video URL and the dialogue to find.'); return; }
-
-    // Reset pipeline steps
-    document.querySelectorAll('.pipe-step').forEach(el => el.classList.remove('active','done','error'));
-
-    // Button state
-    document.getElementById('analyzeBtn').disabled = true;
-    document.getElementById('btnSpinner').style.display = 'block';
-    document.getElementById('btnText').textContent = 'Analyzing…';
-    document.getElementById('resetBtn').style.display = 'none';
-
-    // Clear result area
-    document.getElementById('emptyState') && (document.getElementById('emptyState').remove());
-    document.getElementById('resultBody').innerHTML = `
-      <div class="empty-state fade-in">
-        <div class="es-icon" style="animation: spin 2s linear infinite; display:inline-block;">⚙️</div>
-        <p>Analysis in progress…</p>
-      </div>`;
-
-    fetch('/api/analyze', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({url, dialogue: text})
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) { showError(data.error); resetBtn(); return; }
-      subscribeToStream(data.job_id);
-    })
-    .catch(err => { showError('Failed to start analysis: ' + err.message); resetBtn(); });
-  }
-
-  function subscribeToStream(jobId) {
-    if (_currentSource) _currentSource.close();
-    _currentSource = new EventSource('/api/stream/' + jobId);
-
-    _currentSource.onmessage = function(ev) {
-      const evt = JSON.parse(ev.data);
-      if (evt.type === 'heartbeat') return;
-      if (evt.type === 'stage')  setStage(evt.stage, evt.message);
-      if (evt.type === 'done')  { _currentSource.close(); markAllDone(); showResult(evt.result, jobId); resetBtn(); }
-      if (evt.type === 'error') { _currentSource.close(); markError(); showError(evt.message); resetBtn(); }
-    };
-
-    _currentSource.onerror = function() {
-      _currentSource.close();
-      showError('Connection to server lost. Please try again.');
-      resetBtn();
-    };
-  }
-
-  function markAllDone() {
-    document.querySelectorAll('.pipe-step').forEach(el => { el.classList.remove('active'); el.classList.add('done'); });
-  }
-
-  function markError() {
-    document.querySelectorAll('.pipe-step.active').forEach(el => { el.classList.remove('active'); el.classList.add('error'); });
-  }
-
-  function showResult(result, jobId) {
-    const body = document.getElementById('resultBody');
-
-    if (!result.found) {
-      body.innerHTML = `
-        <div class="not-found-box fade-in">
-          <div class="nf-icon">🔎</div>
-          <h3>Dialogue Not Found</h3>
-          <p>The specified dialogue was not detected in the video. Try checking the URL and the dialogue text, or try a key phrase.</p>
-        </div>`;
-      return;
-    }
-
-    const confClass = result.confidence === 'High' ? 'conf-high'
-                    : result.confidence === 'Low'  ? 'conf-low'
-                    : 'conf-none';
-    const confIcon  = result.confidence === 'High' ? '✓' : '~';
-
-    const scoreBar = result.match_score
-      ? `<div style="margin-top:4px;height:3px;border-radius:2px;background:var(--border);">
-           <div style="height:100%;width:${result.match_score}%;background:${result.confidence==='High'?'var(--success)':'var(--warn)'};border-radius:2px;transition:width .6s ease;"></div>
-         </div>`
-      : '';
-
-    body.innerHTML = `
-      <div class="fade-in">
-
-        <div class="result-frame-wrap" id="frameBox">
-          <div class="frame-placeholder">
-            <span>🎞️</span>
-            <p style="font-size:11px;">Loading frame…</p>
-          </div>
-          <img id="frameImg" alt="Captured frame" />
-          <div class="frame-label" id="frameLabel">Frame ${result.frame ?? '—'}</div>
+      <div class="result-content" id="resultContent">
+        <div class="frame-box">
+          <img id="frameImg" style="display:none;" />
+          <div class="frame-label" id="frameLabel" style="display:none;"></div>
+          <span id="frameFallback" style="color: var(--muted); font-size: 13px;">Loading frame...</span>
         </div>
 
-        <div class="conf-badge ${confClass}">${confIcon} ${result.confidence} Confidence</div>
-
-        <div class="stats-grid">
-          <div class="stat-cell">
+        <div class="stats-panel">
+          <div class="stat-card">
             <label>Timestamp</label>
-            <div class="val">${result.timestamp ?? '—'}</div>
+            <div class="val" id="resTimestamp">—</div>
           </div>
-          <div class="stat-cell">
-            <label>Frame №</label>
-            <div class="val">${result.frame ?? '—'}</div>
+          <div class="stat-card">
+            <label>Frame</label>
+            <div class="val" id="resFrame">—</div>
           </div>
-          <div class="stat-cell">
+          <div class="stat-card">
             <label>Match Score</label>
-            <div class="val">${result.match_score ?? '—'}/100</div>
-            ${scoreBar}
+            <div class="val" id="resScore">—</div>
+          </div>
+          <div class="stat-card">
+            <label>Confidence</label>
+            <div class="val" id="resConfidence">—</div>
           </div>
         </div>
 
-        <div class="extracted-text">
-          <label>Extracted Dialogue</label>
-          <p>"${escHtml(result.text || '')}"</p>
+        <div class="details-row">
+          <div class="detail-box">
+            <label>Extracted Text (OCR)</label>
+            <p id="resText" style="font-style: italic;">—</p>
+          </div>
+          <div class="detail-box">
+            <label>Reasoning</label>
+            <p id="resReason">—</p>
+          </div>
         </div>
+      </div>
+    </main>
 
-        <div class="reason-box">
-          <strong>How this was found:</strong> ${escHtml(result.reasoning || '')}
-        </div>
+  </div>
 
-      </div>`;
+  <script>
+    let _currentSource = null;
+    const STAGE_ORDER = ['downloading','metadata','audio','transcribing','locating','scanning','complete'];
 
-    if (result.has_image) {
+    function setStage(stageId, message) {
+      const idx = STAGE_ORDER.indexOf(stageId);
+      if (idx === -1) return;
+      
+      STAGE_ORDER.forEach((s, i) => {
+        const el = document.getElementById('step-' + s);
+        if (!el) return;
+        el.classList.remove('active','done','error');
+        if (i < idx) el.classList.add('done');
+        else if (i === idx) el.classList.add('active');
+      });
+      
+      const active = document.getElementById('step-' + stageId);
+      if (active && message) {
+        const desc = active.querySelector('.step-desc');
+        if (desc) desc.textContent = message;
+      }
+    }
+
+    function startAnalysis() {
+      const url = document.getElementById('videoUrl').value.trim();
+      const text = document.getElementById('dialogue').value.trim();
+      
+      hideError();
+      if (!url || !text) { showError('Please enter both a URL and dialogue.'); return; }
+
+      // Reset UI
+      document.querySelectorAll('.step').forEach(el => el.classList.remove('active','done','error'));
+      document.getElementById('analyzeBtn').disabled = true;
+      document.getElementById('btnSpinner').style.display = 'block';
+      document.getElementById('btnText').textContent = 'Analyzing...';
+      document.getElementById('resetBtn').style.display = 'none';
+      
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('resultContent').style.display = 'none';
+
+      fetch('/api/analyze', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url, dialogue: text})
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { showError(data.error); resetBtn(); document.getElementById('emptyState').style.display = 'flex'; return; }
+        subscribeToStream(data.job_id);
+      })
+      .catch(err => { showError(err.message); resetBtn(); document.getElementById('emptyState').style.display = 'flex'; });
+    }
+
+    function subscribeToStream(jobId) {
+      if (_currentSource) _currentSource.close();
+      _currentSource = new EventSource('/api/stream/' + jobId);
+
+      _currentSource.onmessage = function(ev) {
+        const evt = JSON.parse(ev.data);
+        if (evt.type === 'stage') setStage(evt.stage, evt.message);
+        if (evt.type === 'done') { _currentSource.close(); markAllDone(); showResult(evt.result, jobId); resetBtn(); }
+        if (evt.type === 'error') { _currentSource.close(); markError(); showError(evt.message); resetBtn(); document.getElementById('emptyState').style.display = 'flex'; }
+      };
+      _currentSource.onerror = function() { _currentSource.close(); showError('Connection lost.'); resetBtn(); };
+    }
+
+    function markAllDone() {
+      document.querySelectorAll('.step').forEach(el => { el.classList.remove('active'); el.classList.add('done'); });
+    }
+    function markError() {
+      document.querySelectorAll('.step.active').forEach(el => { el.classList.remove('active'); el.classList.add('error'); });
+    }
+
+    function showResult(result, jobId) {
+      document.getElementById('resultContent').style.display = 'flex';
+      
+      if (!result.found) {
+        document.getElementById('resultContent').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'flex';
+        document.getElementById('emptyState').innerHTML = `
+          <span style="font-size: 32px; color: var(--warn)">⚠️</span>
+          <p>Dialogue not found in video.</p>`;
+        return;
+      }
+
+      document.getElementById('resTimestamp').textContent = result.timestamp || '—';
+      document.getElementById('resFrame').textContent = result.frame || '—';
+      document.getElementById('resScore').textContent = result.match_score ? (result.match_score + '/100') : '—';
+      
+      const confEl = document.getElementById('resConfidence');
+      confEl.textContent = result.confidence;
+      confEl.className = 'val ' + (result.confidence === 'High' ? 'conf-high' : result.confidence === 'Low' ? 'conf-low' : 'conf-none');
+
+      document.getElementById('resText').textContent = result.text ? `"${result.text}"` : '—';
+      document.getElementById('resReason').textContent = result.reasoning || '—';
+
       const img = document.getElementById('frameImg');
-      img.onload = () => {
-        document.querySelector('#frameBox .frame-placeholder').style.display = 'none';
-        img.style.display = 'block';
-        document.getElementById('frameLabel').style.display = 'block';
-      };
-      img.onerror = () => {
-        document.querySelector('#frameBox .frame-placeholder').innerHTML =
-          '<span>🖼️</span><p style="font-size:11px;">Image unavailable</p>';
-      };
-      img.src = '/api/frame/' + jobId;
+      const label = document.getElementById('frameLabel');
+      const fallback = document.getElementById('frameFallback');
+      
+      img.style.display = 'none';
+      label.style.display = 'none';
+      fallback.style.display = 'block';
+
+      if (result.has_image) {
+        img.onload = () => { img.style.display = 'block'; label.style.display = 'block'; fallback.style.display = 'none'; label.textContent = 'Frame ' + result.frame; };
+        img.onerror = () => { fallback.textContent = 'Image unavailable'; };
+        img.src = '/api/frame/' + jobId + '?t=' + Date.now();
+      } else {
+        fallback.textContent = 'No frame captured';
+      }
     }
-  }
 
-  function resetBtn() {
-    document.getElementById('analyzeBtn').disabled = false;
-    document.getElementById('btnSpinner').style.display = 'none';
-    document.getElementById('btnText').textContent = '▶ Analyze Video';
-    document.getElementById('resetBtn').style.display = 'block';
-  }
-
-  function reset() {
-    if (_currentSource) _currentSource.close();
-    document.querySelectorAll('.pipe-step').forEach(el => el.classList.remove('active','done','error'));
-    hideError();
-    resetBtn();
-    document.getElementById('resetBtn').style.display = 'none';
-    document.getElementById('resultBody').innerHTML = `
-      <div class="empty-state fade-in" id="emptyState">
-        <div class="es-icon">🎞️</div>
-        <p>Enter a video URL and a dialogue line on the left, then click <strong>Analyze Video</strong> to find the exact frame.</p>
-      </div>`;
-  }
-
-  function showError(msg) {
-    const el = document.getElementById('errorBanner');
-    if (msg.includes('cookies.txt') || msg.includes('Export your YouTube')) {
-      el.innerHTML = `
-        <strong>⚠ YouTube requires authentication</strong><br>
-        To download this video, export your YouTube cookies:<br>
-        <ol style="margin:6px 0 0 16px;line-height:1.9">
-          <li>Install <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" style="color:#93c5fd">Get cookies.txt LOCALLY</a> in Chrome</li>
-          <li>Log into YouTube in Chrome, then go to <a href="https://youtube.com" target="_blank" style="color:#93c5fd">youtube.com</a></li>
-          <li>Click the extension icon → Export</li>
-          <li>Save the file as <code style="background:#0d1117;padding:1px 4px;border-radius:3px">cookies.txt</code> in the project root folder</li>
-          <li>Try again — the tool will pick it up automatically</li>
-        </ol>`;
-    } else {
-      el.textContent = '⚠ ' + msg;
+    function resetBtn() {
+      document.getElementById('analyzeBtn').disabled = false;
+      document.getElementById('btnSpinner').style.display = 'none';
+      document.getElementById('btnText').textContent = 'Analyze';
+      document.getElementById('resetBtn').style.display = 'block';
     }
-    el.style.display = 'block';
-  }
 
-  function hideError() {
-    document.getElementById('errorBanner').style.display = 'none';
-  }
+    function reset() {
+      if (_currentSource) _currentSource.close();
+      document.querySelectorAll('.step').forEach(el => { el.classList.remove('active','done','error'); el.querySelector('.step-desc').textContent = 'Waiting'; });
+      hideError();
+      resetBtn();
+      document.getElementById('resetBtn').style.display = 'none';
+      document.getElementById('resultContent').style.display = 'none';
+      document.getElementById('emptyState').style.display = 'flex';
+      document.getElementById('emptyState').innerHTML = `<span style="font-size: 32px; opacity: 0.5;">🎞️</span><p>Enter a URL and dialogue in the top bar to begin.</p>`;
+    }
 
-  function escHtml(s) {
-    return String(s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+    function showError(msg) {
+      const el = document.getElementById('errorBanner');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function hideError() { document.getElementById('errorBanner').style.display = 'none'; }
 
-  ['videoUrl','dialogue'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => {
-      if (e.key === 'Enter') startAnalysis();
+    ['videoUrl','dialogue'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') startAnalysis(); });
     });
-  });
-</script>
-
+  </script>
 </body>
 </html>
