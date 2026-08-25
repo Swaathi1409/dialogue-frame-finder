@@ -142,17 +142,12 @@ def score(ocr_text: str, target: str) -> float:
         if coverage < 0.60:
             return 0.0
 
-    # --- Hybrid fuzzy score: take the MINIMUM of two complementary metrics ---
-    #
-    # partial_ratio: best substring alignment (good for: OCR errors, extra text)
-    # token_set_ratio: word-set comparison after sorting tokens (good for:
-    #   word reordering, different words with shared prefix)
-    #
-    # Taking the minimum ensures neither can paper over the other's weakness.
-    partial = fuzz.partial_ratio(norm_target, norm_ocr)
-    token_set = fuzz.token_set_ratio(norm_target, norm_ocr)
-
-    return min(partial, token_set)
+    # --- Hybrid fuzzy score ---
+    # partial_ratio: best substring alignment - handles OCR char errors and
+    # multi-line captions. The word-boundary and coverage guards above already
+    # prevent the false-positive bugs; we don't need token_set_ratio's extra
+    # strictness, which was too aggressive on real OCR output.
+    return fuzz.partial_ratio(norm_target, norm_ocr)
 
 
 def confidence_bucket(match_score: float, persists: bool) -> tuple:
