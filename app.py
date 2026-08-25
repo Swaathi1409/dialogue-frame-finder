@@ -151,5 +151,9 @@ def get_frame(job_id):
 
 
 if __name__ == "__main__":
+    import os
     logging.basicConfig(level=logging.INFO)
-    app.run(debug=False, port=5000, threaded=True)
+    host = os.environ.get("FLASK_HOST", "127.0.0.1")
+    port = int(os.environ.get("FLASK_PORT", "5000"))
+    app.run(debug=False, host=host, port=port, threaded=True)
+
