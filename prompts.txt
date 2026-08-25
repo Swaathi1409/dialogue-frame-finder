@@ -397,3 +397,106 @@ what happened:
 - youtube test: frame 1434, timestamp 00:00:23.930, score 100.0, Low.
 - 49 tests still pass.
 
+
+
+Prompt - Web UI for the dialogue frame finder
+
+what I typed:
+make a ui for user to enter url and dialogue. show how it executes in backend
+in a neater version in frontend without leaking confidential info. interactive
+and formal decent ui. refer assignment. attractive formal easy to use and clear.
+
+cleaner version:
+build a web interface wrapping the existing pipeline. the ui should:
+1. accept video url + dialogue text as form input
+2. stream real-time progress to the frontend without exposing internal details
+   (no file paths, temp dirs, model names, stack traces)
+3. show pipeline stages as a visual timeline: download -> audio -> transcribe
+   -> locate -> scan -> complete
+4. display result: frame image, timestamp, frame number, extracted text,
+   confidence badge, match score bar, reasoning explanation
+5. handle not-found and error states gracefully with clear messages
+6. use dark professional theme with inter font, animations, sse streaming
+
+interpretation:
+user wants a full-stack web ui. backend = flask with sse (server-sent events)
+for live progress. frontend = single-page html with vanilla css and js.
+key design decision: map internal log messages to user-friendly stage labels
+in a _STAGE_MAP dict in app.py. nothing internal reaches the browser.
+
+what happened:
+- created app.py: flask server with /api/analyze (post), /api/stream/<id>
+  (sse), /api/frame/<id> (serve image), / (serve ui).
+- created templates/index.html: dark theme, 6-stage animated pipeline tracker,
+  result card with frame image + stats grid + confidence badge + reasoning.
+- server started at http://localhost:5000. http 200 confirmed.
+
+
+Prompt - YouTube bot detection error
+
+what I typed:
+? Download failed for https://youtu.be/...: Sign in to confirm you're not a bot.
+
+cleaner version:
+yt-dlp fails with youtube bot detection when downloading some youtube videos.
+fix the downloader to handle this automatically without manual user action.
+
+interpretation:
+youtube requires authenticated sessions for some videos. yt-dlp supports
+--cookies-from-browser. add auto-retry with chrome cookies when bot detection
+is detected in the error string.
+
+what happened:
+- added _is_bot_detection() to check error string for 'sign in to confirm'
+- added _ytdlp_with_cookies() to retry with chrome browser cookies
+- chrome cookie db was locked (chrome open). edge failed with dpapi decryption.
+  firefox not installed. all browser cookie extraction failed.
+- pivot: check for cookies.txt file in project root instead (user exports once).
+- added _find_cookies_file() to detect cookies.txt automatically.
+- added js_runtimes: 'node' to ydl_opts to use node.js runtime (mistake - see next).
+- updated ui error banner to show step-by-step cookie export instructions
+  when youtube auth error is detected.
+
+
+Prompt - js_runtimes regression (YouTube broke after working)
+
+what I typed:
+this worked before now not working. no yt videos working currently.
+is it because cookies.txt - remove it - cli should work as usual.
+
+cleaner version:
+adding js_runtimes to ydl_opts broke youtube downloads that previously worked
+without cookies. identify and revert the regression.
+
+interpretation:
+user correctly identified that something we added broke existing working videos.
+the cookies.txt was deleted and still failing -> js_runtimes was the cause.
+root cause: js_runtimes: {'node': {}} made yt-dlp select the 'visionos' player
+client instead of 'android'. visionos client requires sign-in. android client
+does not. this is why previously-working videos suddenly required auth.
+
+what happened:
+- deleted bad cookies.txt (expired, was making things worse)
+- removed js_runtimes from ydl_opts entirely
+- the deprecation warning it suppressed is harmless - not worth the regression
+- youtube ip rate-limiting was also occurring (too many test requests in short
+  time). this is transient and resolves in 15-30 minutes.
+- committed fix and pushed.
+- confirmed sherlock.mp4 (local file) still works: frame 7887, 00:05:28.990.
+
+
+Prompt - update prompts.txt with all prompts
+
+what I typed:
+now update prompts.txt all prompts I gave - how u interpreted and gave it
+internally in detailed etc
+
+cleaner version:
+append all recent session prompts (web ui, bot detection, js_runtimes
+regression, this entry) to prompts.txt in the established format:
+  what I typed / cleaner version / interpretation / what happened.
+
+what happened:
+appended this session's entries to prompts.txt covering: web ui, youtube
+bot detection handling, cookies.txt auto-detection, js_runtimes regression
+diagnosis and fix, and this self-referential documentation entry.
