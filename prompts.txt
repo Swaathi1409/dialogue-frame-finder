@@ -780,3 +780,21 @@ frame not showing bug:
   fails, scan the on-disk output/web/<job_id>/ directory for a .png file and
   serve it directly. this makes frame serving robust across server restarts.
 - also added ASR_TIE_THRESHOLD to the config table in APPROACH.md.
+
+Prompt - Matcher False Positive Bug Fix
+
+what I typed:
+I gave a video having the text like run slow, run fast, run angry, run tired
+but when I gave input as run tired - it detected the first run and skipped tired - so timestamp printed and frame was wrong
+fix this bug
+
+cleaner version:
+fix the matcher.score() false positive where a frame showing 'run slow' incorrectly matches the target 'run tired' because they share the word 'run'. the pipeline was detecting the first occurrence of 'run' in the video instead of waiting for the exact line 'run tired'.
+
+what happened:
+- identified the root cause: matcher.score() used only partial_ratio, which finds the best same-length window inside the OCR text. 'run tired' against 'run slow' finds 'run ' as a shared prefix, scores ~72, and clears LOW_CONF_THRESHOLD (70), causing the wrong frame to be returned.
+- fixed by introducing a two-mode scoring strategy in matcher.score():
+  - standalone caption mode: when the OCR text is within 2x the target length (i.e. it is a short caption of similar size to the target), blend partial_ratio with ratio equally. this forces full-string similarity to matter, so 'run slow' vs 'run tired' drops to ~50 which is below the threshold.
+  - substring mode: when the OCR text is much longer than the target (target is a phrase inside a larger caption block), keep partial_ratio unchanged so we can still detect the target inside a multi-line caption.
+- added 2 new regression tests: test_shared_prefix_word_does_not_false_positive and test_target_in_long_text_still_matches.
+- all 55 tests pass.
