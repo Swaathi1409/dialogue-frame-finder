@@ -109,10 +109,20 @@ def download_video(url: str, output_dir: str) -> str:
         "quiet": True,
         "no_warnings": False,
         "logger": logging.getLogger("yt_dlp"),
+        # Use Node.js JS runtime so yt-dlp can handle YouTube's player challenge.
+        # Python API expects {"node": {}} not the string "node".
+        "js_runtimes": {"node": {}},
         # Retries: fail fast rather than hanging for minutes on a bad URL.
         "retries": 2,
         "fragment_retries": 2,
     }
+
+    # Auto-detect cookies.txt in the project root for YouTube bot-detection bypass.
+    # Users can export this once with the 'Get cookies.txt LOCALLY' Chrome extension.
+    _cookies_path = _find_cookies_file()
+    if _cookies_path:
+        logger.info("Using cookies file: %s", _cookies_path)
+        ydl_opts["cookiefile"] = _cookies_path
 
     # Tell yt-dlp where to find ffmpeg for stream merging.
     if ffmpeg_dir:
@@ -139,6 +149,19 @@ def download_video(url: str, output_dir: str) -> str:
     except DownloadError:
         raise
     except Exception as e:
+        err_str = str(e)
+
+        # YouTube bot-detection: retry with cookies from the local browser.
+        # yt-dlp raises this when YouTube requires a logged-in session.
+        if _is_bot_detection(err_str):
+            raise DownloadError(
+                f"YouTube requires authentication to download this video. "
+                f"Export your YouTube cookies using the 'Get cookies.txt LOCALLY' "
+                f"Chrome extension, save the file as 'cookies.txt' in the project "
+                f"root folder, and try again. "
+                f"(Original error: {str(e)[:120]})"
+            )
+
         # For ok.ru, Python's TLS stack is blocked by OK.ru's JA3 fingerprint
         # filter. Fall back to the okrudownloader.top backend API which proxies
         # the metadata and returns direct CDN URLs we can download with requests.
@@ -166,6 +189,69 @@ def download_video(url: str, output_dir: str) -> str:
 
     logger.info("Downloaded: %s", downloaded_path)
     return downloaded_path
+
+
+def _is_bot_detection(err_str: str) -> bool:
+    """Check if the error string indicates YouTube bot detection."""
+    return any(x in err_str.lower() for x in [
+        "sign in to confirm you're not a bot",
+        "bot detection",
+        "suspended",
+        "429"
+    ])
+
+
+def _find_cookies_file() -> str | None:
+    """
+    Search for a cookies.txt file to pass to yt-dlp.
+
+    Users can export this once from Chrome using the
+    'Get cookies.txt LOCALLY' extension (available on Chrome Web Store).
+    Steps:
+      1. Install the extension
+      2. Log into YouTube in Chrome
+      3. Click the extension icon on youtube.com -> Export
+      4. Save as 'cookies.txt' in the project root folder
+
+    We check several common locations so the user doesn't need to
+    configure anything - just drop the file in the right place.
+    """
+    candidates = [
+        os.path.join(os.getcwd(), "cookies.txt"),
+        os.path.join(os.path.dirname(__file__), "..", "cookies.txt"),
+    ]
+    for path in candidates:
+        path = os.path.normpath(path)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+
+
+def _ytdlp_with_cookies(url: str, output_dir: str, ydl_opts: dict) -> str:
+    """Retry download using browser cookies to bypass bot detection."""
+    opts = ydl_opts.copy()
+    opts["cookiesfrombrowser"] = ("chrome",)
+    
+    downloaded_path = None
+    def _progress_hook(d):
+        nonlocal downloaded_path
+        if d["status"] == "finished":
+            downloaded_path = d["filename"]
+
+    opts["progress_hooks"] = [_progress_hook]
+    
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download([url])
+        
+    if downloaded_path and os.path.exists(downloaded_path):
+        return downloaded_path
+        
+    path = _find_video_file(output_dir)
+    if not path:
+        raise DownloadError("Cookie-based download failed to produce a file.")
+    return path
 
 
 def _find_video_file(directory: str) -> str | None:

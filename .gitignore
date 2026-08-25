@@ -55,3 +55,5 @@ Thumbs.db
 *.tmp
 *.log
 scratch/
+
+cookies.txt
