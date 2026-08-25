@@ -553,6 +553,11 @@
     document.getElementById('btnText').textContent = 'Analyzing…';
     document.getElementById('resetBtn').style.display = 'none';
 
+    // If the server went to sleep (free tier), this fetch takes up to 60s
+    let wakeupTimer = setTimeout(() => {
+      document.getElementById('btnText').textContent = 'Waking up server (~50s)…';
+    }, 2500);
+
     // POST to start job
     fetch('/api/analyze', {
       method: 'POST',
@@ -561,10 +566,16 @@
     })
     .then(r => r.json())
     .then(data => {
+      clearTimeout(wakeupTimer);
+      document.getElementById('btnText').textContent = 'Analyzing…';
       if (data.error) { showError(data.error); resetBtn(); return; }
       subscribeToStream(data.job_id);
     })
-    .catch(err => { showError('Failed to start analysis: ' + err.message); resetBtn(); });
+    .catch(err => { 
+      clearTimeout(wakeupTimer);
+      showError('Failed to start analysis: ' + err.message); 
+      resetBtn(); 
+    });
   }
 
   function subscribeToStream(jobId) {
