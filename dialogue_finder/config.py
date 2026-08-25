@@ -9,7 +9,7 @@ or a timing pad, change it here. No other file should have magic numbers.
 
 # Whisper model size. "tiny" is fast, "base" is a bit slower but more accurate.
 # On CPU "tiny" usually finishes in well under a minute for a 20-minute video.
-WHISPER_MODEL_SIZE = "base"
+WHISPER_MODEL_SIZE = "tiny"
 
 # Language hint for Whisper. None means auto-detect.
 WHISPER_LANGUAGE = None
@@ -18,16 +18,17 @@ WHISPER_LANGUAGE = None
 
 # When Whisper finds the spoken line at time T seconds, we look for the
 # on-screen caption starting this many seconds before T ...
-ASR_PAD_BEFORE_SEC = 3.0
+ASR_PAD_BEFORE_SEC = 2.0
 
 # ... and ending this many seconds after T.
-ASR_PAD_AFTER_SEC = 8.0
+ASR_PAD_AFTER_SEC = 4.0
 
 # ---------- Coarse frame sampling inside the search window ----------
 
 # How far apart (in seconds) the coarse OCR samples are spaced.
-# 0.5 s gives ~2 frames/sec which is fast enough to catch any visible caption.
-COARSE_SAMPLE_INTERVAL_SEC = 0.5
+# 1.0 s gives 1 frame/sec which is fast enough to catch any visible caption
+# and much faster to process on CPU than 0.5s.
+COARSE_SAMPLE_INTERVAL_SEC = 1.0
 
 # ---------- Fallback full-video scan ----------
 
