@@ -72,7 +72,10 @@ def score(ocr_text: str, target: str) -> float:
 
     # Reject OCR text that is much shorter than the target - it can't
     # contain the full phrase even as a substring.
-    if len(norm_ocr) < len(norm_target) * 0.3:
+    # Guard at 0.5×: "RUN" (3 chars) won't match "run slow" (8 chars) since
+    # 3 < 4 (8 × 0.5). The old 0.3× guard was too lenient and let partial
+    # single-word OCR reads fire false positives on multi-word targets.
+    if len(norm_ocr) < len(norm_target) * 0.5:
         return 0.0
 
     partial = fuzz.partial_ratio(norm_target, norm_ocr)
@@ -81,6 +84,28 @@ def score(ocr_text: str, target: str) -> float:
     # caption), penalize mismatched content by blending in full-string ratio.
     # Threshold: 2× target length. Beyond that, the substring mode takes over.
     if len(norm_ocr) <= len(norm_target) * 2:
+        # Word-level gate: every word in the target must appear (approximately)
+        # somewhere in the OCR words. This prevents "run alone" matching "run slow"
+        # because "slow" has no close match in {"run", "alone"}.
+        # Tolerance rules:
+        #   - Words ≥ 3 chars: require ≥ 80% fuzzy ratio to another OCR word.
+        #     "slow" (4) vs "alone" (5): fuzz.ratio = 22% → rejected correctly.
+        #     "slow" (4) vs "slow" (4):  fuzz.ratio = 100% → accepted correctly.
+        #   - Words ≤ 2 chars (like "I", "am"): accept any OCR token of the same
+        #     length. fuzz.ratio on 1-char strings is binary (0 or 100), so the
+        #     80% rule cannot accommodate the common OCR error "I" → "1".
+        target_words = norm_target.split()
+        ocr_words    = norm_ocr.split()
+        for tw in target_words:
+            if len(tw) <= 2:
+                # Short word: accept if any OCR word has the same length.
+                if not any(len(ow) == len(tw) for ow in ocr_words):
+                    return 0.0
+            else:
+                # Longer word: require fuzzy match ≥ 80%.
+                if not any(fuzz.ratio(tw, ow) >= 80 for ow in ocr_words):
+                    return 0.0
+
         full = fuzz.ratio(norm_target, norm_ocr)
         return (partial + full) / 2.0
 

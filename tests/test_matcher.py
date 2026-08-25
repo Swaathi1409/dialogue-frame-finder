@@ -101,6 +101,15 @@ class TestScore:
             f"'run slow' should not match 'run tired' (got {s:.1f}, threshold {config.LOW_CONF_THRESHOLD})"
         )
 
+    def test_single_word_ocr_does_not_match_multi_word_target(self):
+        # Regression (Instagram bug): OCR reads only "RUN" from a frame that
+        # shows the word "RUN" in large text. Target is "run slow" (two words).
+        # "RUN" is shorter than 0.5 × len("run slow") so it must score 0.
+        s = matcher.score("RUN", "run slow")
+        assert s == 0.0, (
+            f"Single-word OCR 'RUN' should not match 'run slow' (got {s:.1f})"
+        )
+
     def test_target_in_long_text_still_matches(self):
         # When the target appears as a substring in a long OCR block
         # (caption contains multiple lines), the substring mode should

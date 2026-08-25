@@ -106,7 +106,21 @@ def download_video(url: str, output_dir: str) -> str:
     ffmpeg_dir = _get_ffmpeg_dir()
 
     ydl_opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        # Format preference: H.264 MP4 is required because OpenCV on Windows cannot
+        # decode VP9 video even when packed in an .mp4 container.  Instagram and some
+        # other sites serve VP9 as their "best" stream, so we explicitly deprioritise
+        # it.  The preference order is:
+        #   1. H.264 (avc1) MP4 video + m4a audio (ideal)
+        #   2. Any non-VP9 MP4 video + m4a audio
+        #   3. Best single-file MP4 (catches Instagram's combined id=1/2/3 formats
+        #      which have no declared vcodec but are typically H.264)
+        #   4. Best available (absolute last resort)
+        "format": (
+            "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]"
+            "/bestvideo[ext=mp4][vcodec!*=vp09]+bestaudio[ext=m4a]"
+            "/best[ext=mp4]"
+            "/best"
+        ),
         "outtmpl": os.path.join(output_dir, "video.%(ext)s"),
         "quiet": True,
         "no_warnings": False,
