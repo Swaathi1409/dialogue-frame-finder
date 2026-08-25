@@ -667,3 +667,20 @@ what happened:
   on this specific machine's network).
 - updated README.md and APPROACH.md to explain the TLS block and the Playwright
   solution.
+
+Prompt - Playwright Stream Audio Missing Output Check
+
+what I typed:
+where is the output?
+mention it in the output when end user tests they should be notified about this
+
+cleaner version:
+add a logger warning indicating that playwright downloaded streams are raw CDNs and lack audio/high resolution, so that the end user isn't confused when the pipeline falls back to full-video OCR.
+
+what happened:
+- fixed an issue where yt-dlp was indefinitely hanging when ok.ru dropped the connection instead of sending an RST packet. yt-dlp retries were lowered to 1 to force a fail-fast behavior.
+- fixed an issue where playwright's APIRequestContext.get() was timing out on 30MB downloads because it inherited the 60 second default page navigation timeout. Increased download timeout to 10 minutes.
+- fixed an issue where the playwright interceptor was grabbing the DASH ytes=0-3503 initialization chunk instead of the full video. Added a regex substitution to strip the ytes= parameter from the intercepted CDN URL before downloading.
+- verified that stripping the bytes parameter forces ok.ru's CDN to deliver the full monolithic video.
+- verified that the downloaded Playwright fallback stream only contains the video track (because ok.ru DASH streams separate audio and video) and is the adaptive 144p bitrate chunk. This properly triggers the pipeline's full-video fallback.
+- added logger.warning print statements directly to the _playwright_download_fallback success block to clearly notify the end user about the audio missing/resolution limitations so they understand why the pipeline falls back to full-video scanning for ok.ru downloads.
