@@ -745,3 +745,38 @@ what happened:
   still scores above LOW threshold against 'My mind rebels at stagnation'.
 
 - 13 new edge case tests added to test_matcher.py. all 66 tests pass.
+
+Prompt - Tamil Language Support and Frame Display Bug Fix
+
+what I typed:
+tamil also working but works when input is given in tamil and not english as tamil
+add this also in approach.md
+also frame not showing now - fix it
+
+cleaner version:
+document that the tool supports Tamil (and other non-Latin scripts) when the
+target dialogue is typed in native script (Tamil Unicode) not English transliteration.
+also fix the web UI bug where the frame image stays on 'Loading frame...' and never
+appears.
+
+what happened:
+- confirmed that Whisper ASR auto-detects Tamil speech and produces Tamil Unicode
+  transcript segments. fuzzy matching against Tamil Unicode input works correctly
+  and scores 100/100 (as shown in the screenshot: score 100/100, low confidence
+  because PaddleOCR found no burned-in subtitle text).
+- documented in APPROACH.md under 'Multi-language support' section:
+  - Whisper ASR correctly handles Tamil, output is Tamil Unicode.
+  - PaddleOCR uses lang='en' (Latin only), so Tamil captions are not read by OCR.
+  - English transliteration ('kalai vanakkam') will score 0 against Tamil Unicode
+    transcript because the character sets are completely different.
+  - Recommendation: always type the target in its native script.
+
+frame not showing bug:
+- root cause: the /api/frame/<job_id> endpoint checked _JOBS dict (in-memory).
+  when app.py restarts, _JOBS is cleared. the frame image file still exists on
+  disk at output/web/<job_id>/frame_<N>.png, but the endpoint returned 404
+  because the job was not in the in-memory dict.
+- fix: updated get_frame() in app.py to first try in-memory lookup, and if that
+  fails, scan the on-disk output/web/<job_id>/ directory for a .png file and
+  serve it directly. this makes frame serving robust across server restarts.
+- also added ASR_TIE_THRESHOLD to the config table in APPROACH.md.
