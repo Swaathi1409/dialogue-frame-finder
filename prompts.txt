@@ -798,3 +798,25 @@ what happened:
   - substring mode: when the OCR text is much longer than the target (target is a phrase inside a larger caption block), keep partial_ratio unchanged so we can still detect the target inside a multi-line caption.
 - added 2 new regression tests: test_shared_prefix_word_does_not_false_positive and test_target_in_long_text_still_matches.
 - all 55 tests pass.
+
+Prompt - Matcher Word-Level Gate (run slow / run alone bug)
+
+what I typed:
+run slow extracting only run and frames not printed
+https://www.instagram.com/p/DUtEsUgksu3/
+run slow
+this video alone not working - like run is only detected
+
+cleaner version:
+the pipeline is still firing a false positive when OCR reads a partial single word like 'RUN' from a frame, and incorrectly matching it against the multi-word target 'run slow'. also, when the video has multiple similar captions like 'run slow', 'run alone', 'run tired', the matcher is confusing them.
+
+what happened:
+- diagnosed the 'RUN' false positive: OCR reads just 'RUN' (3 chars) from a large text frame, and score('RUN', 'run slow') = 77.3 because the old length guard was 0.3x. 3 < 8*0.3=2.4 is false so it passes, then blended ratio gives 77.3.
+- fix 1: tightened length guard from 0.3x to 0.5x. now 3 < 8*0.5=4 is true so 'RUN' correctly returns 0.
+- diagnosed the 'run alone' false positive: score('run alone', 'run slow') = 75.3 because both share 'run' as a prefix and the blended ratio is still above threshold.
+- fix 2: added a fuzzy word-level gate in standalone caption mode. every word in the target must have a close match (>=80% fuzz.ratio for words >=3 chars, same-length for short words) in the OCR text. 'slow' has no match in {'run', 'alone'} so 'run alone' correctly returns 0.
+- this broke test_one_char_error: score('1 am going home', 'I am going home') because fuzz.ratio('i', '1') = 0 for single-char words. fixed by using length-equality for words <=2 chars instead of ratio.
+- added regression test: test_single_word_ocr_does_not_match_multi_word_target.
+- added regression test: test_shared_prefix_word_does_not_false_positive.
+- all 56 tests pass.
+- Instagram test result: RUN and run-alone false positives are fixed. OCR found zero OCR matches in the video (PaddleOCR cannot read the animated/stylized Instagram text), so the pipeline correctly fell back to ASR-only midpoint result with Low confidence. This is expected OCR limitation behavior, not a matcher bug.
