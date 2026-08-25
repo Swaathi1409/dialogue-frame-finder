@@ -844,3 +844,15 @@ what happened:
 - tested CLI in Docker successfully (found frame 1312 with 96.2 score).
 - tested web UI in Docker successfully on port 5001.
 
+
+PHASE 8 - DEPLOYMENT AND DOCUMENTATION
+
+Prompt 8.1
+what I typed:
+yes...go
+also dont forget to add instructions in readme.md and wherever necessary
+
+what happened:
+- Updated README.md with full Docker deployment instructions, including how to run the CLI and Web UI containers.
+- Committed final documentation changes.
+- Project is complete and ready for deployment.
