@@ -684,3 +684,20 @@ what happened:
 - verified that stripping the bytes parameter forces ok.ru's CDN to deliver the full monolithic video.
 - verified that the downloaded Playwright fallback stream only contains the video track (because ok.ru DASH streams separate audio and video) and is the adaptive 144p bitrate chunk. This properly triggers the pipeline's full-video fallback.
 - added logger.warning print statements directly to the _playwright_download_fallback success block to clearly notify the end user about the audio missing/resolution limitations so they understand why the pipeline falls back to full-video scanning for ok.ru downloads.
+
+Prompt - Improving Playwright Fallback Quality
+
+what I typed:
+is it possible to improve the resolution and get the audio
+okay update it in prompt.txt
+
+cleaner version:
+document the findings regarding OK.ru's DASH stream separation and the limitations of the current Playwright interceptor, and explain how it could be improved in the future to download high-resolution streams with audio.
+
+what happened:
+- analyzed the network requests made by OK.ru's video player via playwright.
+- discovered that OK.ru uses DASH (Dynamic Adaptive Streaming over HTTP) which completely separates audio and video into different stream chunks, and offers multiple video resolutions marked by a 	ype= parameter (e.g. type=0, type=3, type=4).
+- identified that our Playwright interceptor currently grabs the very first video chunk requested by the browser, which is always the lowest quality (144p) adaptive bitrate stream (to ensure instant playback start) and contains no audio.
+- noted that to improve this, the interceptor would need to collect all variant URLs for a few seconds, perform HEAD requests to find the largest file (highest resolution), intercept the separate audio stream, download both, and merge them via FFmpeg.
+- attempted to prototype this, but the local network hit a hard ERR_CONNECTION_RESET firewall block on the ok.ru HTML document itself, preventing Playwright from even loading the player.
+- decided to leave the fallback as-is for now, as it successfully acquires a video file and gracefully falls back to a full-video OCR scan when audio is missing, which meets the baseline requirement for bypassing the TLS block.
