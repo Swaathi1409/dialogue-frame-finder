@@ -142,21 +142,12 @@ def stream(job_id):
 
 @app.route("/api/frame/<job_id>")
 def get_frame(job_id):
-    # First try: job is still in memory (normal case - same server session).
-    if job_id in _JOBS:
-        path = _JOBS[job_id].get("frame_path")
-        if path and os.path.exists(path):
-            return send_file(path, mimetype="image/png")
-
-    # Second try: job completed but server was restarted (in-memory dict cleared).
-    # Scan the on-disk output directory for any PNG in the job's folder.
-    job_dir = os.path.join("output", "web", job_id)
-    if os.path.isdir(job_dir):
-        for fname in os.listdir(job_dir):
-            if fname.endswith(".png"):
-                return send_file(os.path.join(job_dir, fname), mimetype="image/png")
-
-    return jsonify({"error": "Frame image not available"}), 404
+    if job_id not in _JOBS:
+        return jsonify({"error": "Job not found"}), 404
+    path = _JOBS[job_id].get("frame_path")
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "Frame image not available"}), 404
+    return send_file(path, mimetype="image/png")
 
 
 if __name__ == "__main__":

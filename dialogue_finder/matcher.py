@@ -4,33 +4,19 @@ matcher.py - Text normalization and fuzzy matching.
 This module has zero external I/O and no model dependencies. Every function
 here can be unit tested with a plain pytest run, no mocks needed.
 
-Why a hybrid scorer and not just partial_ratio?
------------------------------------------------
-partial_ratio finds the best same-length substring overlap between two strings.
-This is great for OCR noise (a dropped letter, a comma vs period) but has a
-known false-positive problem: "run tired" scores high against "run slow" because
-the "run " prefix creates a strong substring overlap.
-
-We fix this with a hybrid approach:
-  1. partial_ratio  - catches OCR character-level noise and multi-line captions
-  2. token_set_ratio - forces word-level comparison (sorts and deduplicates tokens
-                       before matching), so "run tired" vs "run slow" scores low
-                       because "tired" and "slow" are different words.
-  3. Take the MINIMUM of both scores - a string can't score high unless it
-     passes BOTH the substring and the word-level check.
-
-We also add two extra guards:
-  - Word coverage check: for multi-word targets, require that the majority of
-    target words appear (individually fuzzy-matched) in the OCR text.
-  - Word boundary check for short (1-2 word) targets: "run" must appear as a
-    whole word, not inside "running" or "runner".
+Why RapidFuzz partial_ratio and not exact match?
+OCR makes small errors - a capital I becomes a 1, punctuation gets
+dropped, spacing shifts. Exact matching would miss real hits. partial_ratio
+checks whether the target appears as a substring of the OCR text (or vice
+versa) rather than requiring full string equality. That handles the common
+case where a caption block contains the target line among other text.
 
 All thresholds come from config.py so they can be tuned without touching
 this file.
 """
 
 import re
-from rapidfuzz import fuzz, process
+from rapidfuzz import fuzz
 from dialogue_finder import config
 
 
@@ -54,57 +40,29 @@ def normalize(text: str) -> str:
     return text
 
 
-def _word_coverage(norm_ocr: str, norm_target_words: list) -> float:
-    """
-    Return the fraction of target words that appear (fuzz-matched) in norm_ocr.
-
-    Each target word is checked against all words in the OCR text using a
-    simple token presence check. A word is considered 'covered' if rapidfuzz
-    finds an 80+ score match for it among the OCR words.
-
-    This prevents "run tired" from matching "run slow": "tired" is not present
-    in "run slow", so coverage falls below 1.0.
-
-    Returns a float in [0.0, 1.0].
-    """
-    if not norm_target_words:
-        return 1.0
-    ocr_words = norm_ocr.split()
-    if not ocr_words:
-        return 0.0
-
-    covered = 0
-    for word in norm_target_words:
-        # rapidfuzz process.extractOne returns the best match and its score
-        result = process.extractOne(word, ocr_words, scorer=fuzz.ratio)
-        if result and result[1] >= 80:
-            covered += 1
-
-    return covered / len(norm_target_words)
-
-
 def score(ocr_text: str, target: str) -> float:
     """
     Return a fuzzy match score (0-100) between ocr_text and target.
 
-    Both strings are normalized before scoring. Uses a hybrid approach:
+    Both strings are normalized before scoring.
 
-    1. partial_ratio  - robust to OCR character errors and multi-line text
-    2. token_set_ratio - robust to word reordering, forces word-level matching
-    3. Take the MINIMUM - a string must pass BOTH checks to score high.
-    4. Word coverage gate - for multi-word targets, require most target words
-       are actually present in the OCR text (prevents "run" prefix false hits).
-    5. Word boundary check - for very short targets (<=2 words), require each
-       target word appears as a whole word (not inside a longer word).
+    Matching strategy (two-mode):
+    ─────────────────────────────
+    • Standalone caption mode (OCR text is within 2× the target length):
+      The frame shows a caption that is roughly the same length as what
+      we are looking for. In this case we blend partial_ratio with ratio
+      (equal weight). partial_ratio alone is too permissive here: it finds
+      the best same-length window inside the OCR text, so "run slow" scores
+      ~72 against "run tired" just because they share the word "run".
+      Taking the average forces full-string similarity to matter, so "run slow"
+      vs "run tired" drops to ~50 and won't clear the LOW_CONF_THRESHOLD.
+
+    • Substring mode (OCR text is much longer than the target):
+      The caption block contains multiple lines or extra text beyond the
+      target phrase. partial_ratio is exactly right here: we want to find
+      whether the target appears *anywhere* inside the longer text.
 
     Returns 0.0 if either string is empty after normalization.
-
-    Examples of bugs this fixes:
-      - score("run slow", "run tired")     -> low  (was: high with partial_ratio)
-      - score("running fast", "run")       -> low  (was: high, prefix in substring)
-      - score("run tired fast", "run tired") -> high (still works, correct match)
-      - score("My mind repels stagnation", "My mind rebels at stagnation") -> ~85
-        (still high, minor OCR noise tolerance is preserved)
     """
     norm_ocr = normalize(ocr_text)
     norm_target = normalize(target)
@@ -112,42 +70,22 @@ def score(ocr_text: str, target: str) -> float:
     if not norm_ocr or not norm_target:
         return 0.0
 
-    # Reject OCR text that is much shorter than the target.
-    # partial_ratio gives 100 for any 1-char match, so a 1-char OCR output
-    # would always score 100. We block this by requiring OCR length be at
-    # least 30% of target length.
+    # Reject OCR text that is much shorter than the target - it can't
+    # contain the full phrase even as a substring.
     if len(norm_ocr) < len(norm_target) * 0.3:
         return 0.0
 
-    target_words = norm_target.split()
-    num_target_words = len(target_words)
+    partial = fuzz.partial_ratio(norm_target, norm_ocr)
 
-    # --- Guard 1: Word boundary check for short targets ---
-    # For targets of 1-2 words, require each word to appear as a whole word
-    # (not embedded in a longer word like "run" inside "running").
-    # This catches prefix false-positives on short queries.
-    if num_target_words <= 2:
-        for word in target_words:
-            if not re.search(r"\b" + re.escape(word) + r"\b", norm_ocr):
-                return 0.0
+    # If the OCR text is roughly the same length as the target (standalone
+    # caption), penalize mismatched content by blending in full-string ratio.
+    # Threshold: 2× target length. Beyond that, the substring mode takes over.
+    if len(norm_ocr) <= len(norm_target) * 2:
+        full = fuzz.ratio(norm_target, norm_ocr)
+        return (partial + full) / 2.0
 
-    # --- Guard 2: Word coverage gate for multi-word targets ---
-    # For longer targets, require that the majority of target words appear
-    # individually in the OCR text. This catches the "run slow" vs "run tired"
-    # class of false positives where a shared prefix scores high.
-    if num_target_words > 2:
-        coverage = _word_coverage(norm_ocr, target_words)
-        # Require at least 60% of words covered (generous to allow OCR errors
-        # on individual words while still blocking completely wrong phrases).
-        if coverage < 0.60:
-            return 0.0
-
-    # --- Hybrid fuzzy score ---
-    # partial_ratio: best substring alignment - handles OCR char errors and
-    # multi-line captions. The word-boundary and coverage guards above already
-    # prevent the false-positive bugs; we don't need token_set_ratio's extra
-    # strictness, which was too aggressive on real OCR output.
-    return fuzz.partial_ratio(norm_target, norm_ocr)
+    # Substring mode: OCR text is a long block; look for the target inside it.
+    return partial
 
 
 def confidence_bucket(match_score: float, persists: bool) -> tuple:

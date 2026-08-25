@@ -104,24 +104,6 @@ wording than what is spoken, or the text may appear before/after it is
 spoken. We use Whisper only to find a rough time window, not to confirm
 the text. The OCR pass is the only confirmation.
 
-**Multi-language support (Tamil and other non-Latin scripts)**
-The pipeline works on Tamil (and other non-Latin languages) provided the
-*target dialogue is typed in the native script* (e.g. Tamil Unicode: காலை வணக்கம்),
-not as English transliteration (e.g. "kalai vanakkam").
-
-- **Whisper ASR** — faster-whisper with `WHISPER_LANGUAGE = None` (auto-detect)
-  correctly transcribes Tamil speech and produces Tamil Unicode transcript segments.
-  Matching the Tamil Unicode input against those segments works correctly.
-- **PaddleOCR** — the default PaddleOCR model used here (`lang='en'`) reads only
-  Latin-script text. Tamil on-screen captions will not be detected by OCR. When
-  Tamil captions are not burned in (or are in a non-Latin font), the pipeline
-  correctly falls back to the ASR segment midpoint frame and returns Low confidence.
-- **English transliteration will NOT match** — typing "kalai vanakkam" (Latin)
-  against a Whisper transcript that says "காலை வணக்கம்" (Tamil Unicode) produces
-  a 0 fuzzy score because the character sets are completely different.
-- **Recommendation:** Always enter the target dialogue in its native script for
-  non-English videos.
-
 ## All thresholds
 
 All tunable values are in `dialogue_finder/config.py`. No magic numbers
@@ -132,7 +114,6 @@ appear in any other file.
 | HIGH_CONF_THRESHOLD | 90 | Score for High confidence |
 | LOW_CONF_THRESHOLD | 70 | Score for Low confidence |
 | ASR_MATCH_THRESHOLD | 60 | Min score to use ASR window |
-| ASR_TIE_THRESHOLD | 5.0 | Score margin within which later ASR segments are preferred |
 | ASR_PAD_BEFORE_SEC | 2.0 | Seconds before ASR segment |
 | ASR_PAD_AFTER_SEC | 4.0 | Seconds after ASR segment |
 | COARSE_SAMPLE_INTERVAL_SEC | 1.0 | OCR sampling interval (ASR window) |

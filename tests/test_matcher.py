@@ -90,6 +90,27 @@ class TestScore:
         s = matcher.score("she said hello to the world", "hello world")
         assert s > 70.0
 
+    def test_shared_prefix_word_does_not_false_positive(self):
+        # Regression: "run slow" and "run tired" share the word "run".
+        # Before the fix, partial_ratio("run tired", "run slow") scored ~72
+        # because it found "run " as a matching window, which cleared
+        # LOW_CONF_THRESHOLD (70) and caused the wrong frame to be returned.
+        # With the blended scoring fix this must score < LOW_CONF_THRESHOLD.
+        s = matcher.score("run slow", "run tired")
+        assert s < config.LOW_CONF_THRESHOLD, (
+            f"'run slow' should not match 'run tired' (got {s:.1f}, threshold {config.LOW_CONF_THRESHOLD})"
+        )
+
+    def test_target_in_long_text_still_matches(self):
+        # When the target appears as a substring in a long OCR block
+        # (caption contains multiple lines), the substring mode should
+        # still produce a high score.
+        long_ocr = "run slow run fast run angry run tired something else"
+        s = matcher.score(long_ocr, "run tired")
+        assert s >= config.LOW_CONF_THRESHOLD, (
+            f"'run tired' inside long text should match (got {s:.1f})"
+        )
+
 
 class TestConfidenceBucket:
     def test_high_confidence_when_score_and_persistence(self):
@@ -128,87 +149,3 @@ class TestConfidenceBucket:
                 label, reason = matcher.confidence_bucket(score_val, persists)
                 assert isinstance(reason, str)
                 assert len(reason) > 0
-
-
-class TestEdgeCases:
-    """
-    Tests covering false-positive bugs that were reported:
-
-    Bug 1 (main reported bug): "run tired" incorrectly matched "run slow"
-    because partial_ratio found the shared "run " prefix and scored high.
-    The fix: hybrid scoring (min of partial_ratio + token_set_ratio) + word
-    coverage gate means "tired" must be present in the OCR text.
-
-    Bug 2: "run" matched "running" or "runner" because partial_ratio treats
-    any substring as valid. The fix: word boundary check for short targets.
-
-    Bug 3: Very short single-word queries on irrelevant text should score 0.
-    """
-
-    def test_run_tired_does_not_match_run_slow(self):
-        # The primary reported bug: "run tired" was matching frames showing
-        # "run slow" because both start with "run".
-        s = matcher.score("run slow", "run tired")
-        assert s < config.LOW_CONF_THRESHOLD, (
-            f"'run tired' must not match 'run slow', got score={s}"
-        )
-
-    def test_run_tired_does_not_match_run_fast(self):
-        s = matcher.score("run fast", "run tired")
-        assert s < config.LOW_CONF_THRESHOLD
-
-    def test_run_tired_does_not_match_run_angry(self):
-        s = matcher.score("run angry", "run tired")
-        assert s < config.LOW_CONF_THRESHOLD
-
-    def test_run_tired_matches_run_tired(self):
-        # The correct match must still score high.
-        s = matcher.score("run tired", "run tired")
-        assert s >= config.HIGH_CONF_THRESHOLD
-
-    def test_run_tired_matches_in_longer_caption(self):
-        # Target phrase embedded in a longer OCR block - must still score high.
-        s = matcher.score("she was run tired from the day", "run tired")
-        assert s >= config.LOW_CONF_THRESHOLD
-
-    def test_run_does_not_match_running(self):
-        # Word boundary check: "run" should not match "running"
-        s = matcher.score("running fast", "run")
-        assert s < config.LOW_CONF_THRESHOLD, (
-            f"'run' must not match 'running', got score={s}"
-        )
-
-    def test_run_does_not_match_runner(self):
-        s = matcher.score("the runner won", "run")
-        assert s < config.LOW_CONF_THRESHOLD
-
-    def test_run_matches_run_word(self):
-        # Single word should match when it appears as a whole word.
-        s = matcher.score("they run every day", "run")
-        assert s >= config.LOW_CONF_THRESHOLD
-
-    def test_ocr_noise_tolerance_preserved(self):
-        # OCR often misreads letters. "rebels" -> "repels", "at" dropped.
-        # This must still score above LOW threshold (real-world OCR case).
-        s = matcher.score("My mind repels its stagnation", "My mind rebels at stagnation")
-        assert s >= config.LOW_CONF_THRESHOLD, (
-            f"OCR noise tolerance broken: score={s}"
-        )
-
-    def test_completely_different_phrases_with_one_common_word(self):
-        # Sharing only one word should not be enough to match.
-        s = matcher.score("the cat sat on the mat", "the dog ran in the park")
-        assert s < config.LOW_CONF_THRESHOLD
-
-    def test_empty_ocr_with_short_target(self):
-        assert matcher.score("", "run") == 0.0
-
-    def test_multiword_target_with_all_words_present(self):
-        # All words of the target appear in OCR - should match.
-        s = matcher.score("I cannot go on like this anymore", "cannot go on")
-        assert s >= config.LOW_CONF_THRESHOLD
-
-    def test_multiword_target_with_no_words_present(self):
-        # None of the target words appear in OCR - must not match.
-        s = matcher.score("hello there general kenobi", "run tired now")
-        assert s < config.LOW_CONF_THRESHOLD
