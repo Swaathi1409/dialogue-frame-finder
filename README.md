@@ -102,9 +102,9 @@ See [APPROACH.md](APPROACH.md) for the full algorithm.
 
 1. **Download** — yt-dlp fetches the video (with ok.ru fallback via okrudownloader.top API)
 2. **Audio** — ffmpeg extracts 16kHz mono WAV
-3. **ASR** — faster-whisper transcribes speech to timestamped segments
-4. **Locate** — fuzzy-match target against transcript → search window
-5. **OCR scan** — PaddleOCR scans frames in the window for burned-in text
+3. **ASR** — faster-whisper transcribes speech to timestamped segments (using `tiny` model for CPU speed)
+4. **Locate** — fuzzy-match target against transcript → search window (padded by a few seconds)
+5. **OCR scan** — PaddleOCR scans frames in the window for burned-in text at 1.0s intervals
 6. **Fallback** — if no on-screen text found, uses ASR segment midpoint frame
 
 ---

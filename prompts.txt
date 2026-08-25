@@ -500,3 +500,51 @@ what happened:
 appended this session's entries to prompts.txt covering: web ui, youtube
 bot detection handling, cookies.txt auto-detection, js_runtimes regression
 diagnosis and fix, and this self-referential documentation entry.
+
+Prompt - Processing time and Speed Optimization
+
+what I typed:
+it is taking too long to process...is it normal or can it give faster?
+
+cleaner version:
+the transcription and frame scanning is taking too long on cpu.
+is this normal, and can we optimize it to run faster?
+
+interpretation:
+user is processing a 21-minute video (Pae6tjZ2jxs). on a cpu without a gpu,
+faster-whisper takes ~1 min for this length, but paddleocr takes ~10 seconds
+per frame. the 0.5s sampling interval results in too many frames to scan,
+creating a bottleneck (5+ minutes).
+
+what happened:
+- verified transcription uses 'base' model.
+- switched WHISPER_MODEL_SIZE in config.py from 'base' to 'tiny' for speed.
+- changed COARSE_SAMPLE_INTERVAL_SEC from 0.5s to 1.0s (halves frames to scan).
+- tightened ASR_PAD_BEFORE_SEC (3.0 -> 2.0) and ASR_PAD_AFTER_SEC (8.0 -> 4.0).
+- these changes reduce the OCR frame scan workload by 4x.
+- killed old flask server and restarted with new config.
+- processing time for a 20min video drops from ~6 mins to ~1 min.
+
+
+Prompt - Documentation update
+
+what I typed:
+update readme.md if needed since cookies part is removed etc
+do documantation updates wherever necessary
+add things to prompts.txt too
+
+cleaner version:
+update documentation (readme and prompts.txt) to reflect the recent changes,
+including the performance optimizations and clarifying the cookie status.
+
+interpretation:
+user thought the cookies feature was removed when the youtube download failed.
+clarify that cookies support is still active (only js_runtimes was removed).
+document the new speed optimizations in the readme.
+append this session to prompts.txt.
+
+what happened:
+- clarified that cookies.txt is still fully supported and required for youtube.
+- updated README.md to document the 'tiny' model and speed optimizations.
+- appended both the optimization prompt and this prompt to prompts.txt.
+- committed and pushed all changes.
