@@ -856,3 +856,4 @@ what happened:
 - Updated README.md with full Docker deployment instructions, including how to run the CLI and Web UI containers.
 - Committed final documentation changes.
 - Project is complete and ready for deployment.
+- Successfully deployed to Render! The live application is running at: https://dialogue-frame-finder.onrender.com
