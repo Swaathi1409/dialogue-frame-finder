@@ -116,7 +116,39 @@ See [APPROACH.md](APPROACH.md) for the full algorithm.
 python -m pytest tests/ -v
 ```
 
-All 49 tests run without a real video or network access.
+All 50+ tests run without a real video or network access.
+
+---
+
+## Docker Deployment
+
+You can run both the CLI and Web UI via Docker without installing any Python or system dependencies on your machine. The image comes with PaddleOCR, Whisper, and Playwright Chromium pre-baked.
+
+### Build the image
+
+```bash
+# This takes 10-15 minutes on the first run (bakes AI models and headless browser)
+docker build --network=host -t dialogue-frame-finder .
+```
+
+### Run the CLI
+
+Mount an output directory to save the extracted frame:
+
+```bash
+mkdir -p output
+docker run --rm -v "${PWD}/output:/app/output" dialogue-frame-finder "https://youtu.be/Pae6tjZ2jxs" "so happy you are here today"
+```
+
+### Run the Web UI
+
+Run the container in detached mode (`-d`) and map port 5000:
+
+```bash
+docker run -d -p 5001:5000 --name dff-web dialogue-frame-finder web
+```
+
+Then visit **http://localhost:5001** in your browser.
 
 ---
 
