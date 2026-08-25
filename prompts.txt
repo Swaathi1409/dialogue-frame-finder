@@ -548,3 +548,37 @@ what happened:
 - updated README.md to document the 'tiny' model and speed optimizations.
 - appended both the optimization prompt and this prompt to prompts.txt.
 - committed and pushed all changes.
+
+Prompt - GPU Acceleration Check
+
+what I typed:
+check if gpu access there in user's computer and and use it instead of cpu for
+faster processing - can it be done without errors
+if so do it
+refine this prompt according to this project and then execute
+ao update prompts.txt as I prompt - dont wait for me to say each time
+
+cleaner version:
+check the system for a usable GPU. if a supported GPU (like NVIDIA/CUDA) is
+available, update the pipeline (faster-whisper and PaddleOCR) to use it for
+faster processing instead of the CPU. ensure this is done without introducing
+errors. also, automatically log prompts to prompts.txt going forward.
+
+interpretation:
+user wants to speed up processing further by utilizing hardware acceleration if
+available. I need to check the system's video controller. if an NVIDIA GPU is
+present, I can switch device="cpu" to device="cuda" and use_gpu=False to
+use_gpu=True. if not, I must explain why it can't be done to avoid breaking the
+app. going forward, I must append my prompt interpretation to prompts.txt
+automatically.
+
+what happened:
+- ran 'nvidia-smi' -> command not found.
+- queried Windows WMI for Win32_VideoController -> returned "Intel(R) Iris(R) Xe Graphics".
+- Intel integrated GPUs do not support CUDA. while OpenVINO exists, it requires
+  a complex, error-prone custom environment that breaks the "simple pip install"
+  requirement of the assignment.
+- concluded that GPU acceleration cannot be safely enabled on this specific
+  machine without causing errors.
+- left the models on CPU (which is now optimized) and reported findings to user.
+- appended this interaction directly to prompts.txt as requested.
