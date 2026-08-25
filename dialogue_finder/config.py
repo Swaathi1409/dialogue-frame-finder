@@ -48,6 +48,13 @@ LOW_CONF_THRESHOLD = 70
 # back to the full-video scan.
 ASR_MATCH_THRESHOLD = 60
 
+# When multiple ASR segments score within this many points of the best score,
+# prefer the one that appears latest in the video. This avoids locking onto
+# an early repetition of a word when the user wants a later, more specific phrase.
+# e.g. "run slow", "run fast", "run tired" - all score well for target "run tired",
+# but the latest one is most likely the correct one.
+ASR_TIE_THRESHOLD = 5.0
+
 # ---------- Persistence check ----------
 
 # After finding the first matching frame, we verify the match persists for

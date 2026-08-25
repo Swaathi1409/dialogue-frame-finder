@@ -48,25 +48,26 @@ def find_asr_window(
 
     Clamping at 0 and duration is important - without it a segment at the
     very start of the video would produce a negative start time.
+
+    Tie-breaking:
+    When multiple segments score within ASR_TIE_THRESHOLD of the best score,
+    we prefer the LATEST one. The rationale: if the same phrase appears
+    multiple times (e.g. "run slow", "run fast", "run tired"), and we're
+    searching for "run tired", the latest match in audio is most likely to
+    correspond to the caption we want. The first "run" occurrence is usually
+    the wrong one.
     """
     if not segments:
         logger.info("No transcript segments - falling back to full-video scan")
         return None
 
     best_score = 0.0
-    best_segment = None
 
+    # First pass: find the best score across all segments.
     for seg in segments:
         s = matcher.score(seg.text, target)
         if s > best_score:
             best_score = s
-            best_segment = seg
-
-    logger.info(
-        "Best ASR match: score=%.1f, text='%s'",
-        best_score,
-        best_segment.text if best_segment else "",
-    )
 
     if best_score < config.ASR_MATCH_THRESHOLD:
         logger.info(
@@ -75,6 +76,25 @@ def find_asr_window(
             config.ASR_MATCH_THRESHOLD,
         )
         return None
+
+    # Second pass: among all segments within ASR_TIE_THRESHOLD of the best,
+    # pick the one that starts latest in the video.
+    # This avoids anchoring to an early, generic match when the target phrase
+    # appears repeatedly (e.g. "run slow/fast/angry/tired" all contain "run").
+    best_segment = None
+    for seg in segments:
+        s = matcher.score(seg.text, target)
+        if s >= best_score - config.ASR_TIE_THRESHOLD:
+            # Prefer later segments (latest start time wins in a tie).
+            if best_segment is None or seg.start_sec > best_segment.start_sec:
+                best_segment = seg
+                best_score = s  # update to the actual score of this segment
+
+    logger.info(
+        "Best ASR match: score=%.1f, text='%s'",
+        best_score,
+        best_segment.text if best_segment else "",
+    )
 
     start = max(0.0, best_segment.start_sec - config.ASR_PAD_BEFORE_SEC)
     end = min(video_duration_sec, best_segment.end_sec + config.ASR_PAD_AFTER_SEC)
