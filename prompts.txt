@@ -701,3 +701,47 @@ what happened:
 - noted that to improve this, the interceptor would need to collect all variant URLs for a few seconds, perform HEAD requests to find the largest file (highest resolution), intercept the separate audio stream, download both, and merge them via FFmpeg.
 - attempted to prototype this, but the local network hit a hard ERR_CONNECTION_RESET firewall block on the ok.ru HTML document itself, preventing Playwright from even loading the player.
 - decided to leave the fallback as-is for now, as it successfully acquires a video file and gracefully falls back to a full-video OCR scan when audio is missing, which meets the baseline requirement for bypassing the TLS block.
+
+Prompt - False Positive Matcher Bug Fix
+
+what I typed:
+I gave a video having the text like run slow, run fast, run angry, run tired
+but when I gave input as run tired - it detected the first run and skipped tired
+so timestamp printed and frame was wrong. fix this bug, analyze other edge cases too.
+
+cleaner version:
+fix a false positive bug in matcher.py where partial_ratio substring scoring
+causes 'run tired' to match 'run slow' due to the shared 'run ' prefix.
+also fix word-boundary false positives ('run' matching 'running') and
+repeated-phrase ASR anchoring (localizer picking the earliest occurrence
+of a repeated word instead of the most specific match). update tests.
+
+what happened:
+- root cause: bare fuzz.partial_ratio finds the best same-length substring
+  alignment. 'run tired' (9 chars) aligns over 'run slow' (8 chars) and the
+  shared 'run ' prefix gives a score above 70, triggering a false match.
+
+- fix 1 (matcher.py): replaced partial_ratio with a HYBRID scorer:
+    min(partial_ratio, token_set_ratio)
+  partial_ratio handles OCR character noise. token_set_ratio forces word-level
+  comparison. taking the minimum means both must agree - a shared prefix alone
+  can no longer push the score above threshold.
+
+- fix 2 (matcher.py): added word-boundary check for short targets (1-2 words).
+  'run' is now checked against the OCR text with re.search(r'\brun\b') before
+  fuzzy scoring, so 'run' cannot match 'running' or 'runner'.
+
+- fix 3 (matcher.py): added word-coverage gate for multi-word targets.
+  requires 60% of target words to appear individually in the OCR text.
+  this blocks 'run slow' from matching target 'run tired' because 'tired'
+  is not present.
+
+- fix 4 (localizer.py + config.py): added ASR_TIE_THRESHOLD = 5.0.
+  when multiple Whisper segments score within 5 points of the best score,
+  the LATEST segment is preferred. this prevents anchoring on an early
+  generic 'run' segment when the user wants the later 'run tired' segment.
+
+- verified: OCR noise tolerance still intact. 'My mind repels its stagnation'
+  still scores above LOW threshold against 'My mind rebels at stagnation'.
+
+- 13 new edge case tests added to test_matcher.py. all 66 tests pass.
