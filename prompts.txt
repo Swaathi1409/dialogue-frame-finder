@@ -582,3 +582,22 @@ what happened:
   machine without causing errors.
 - left the models on CPU (which is now optimized) and reported findings to user.
 - appended this interaction directly to prompts.txt as requested.
+
+Prompt - Where is the input code?
+
+what I typed:
+show where is the code for input given
+
+cleaner version:
+where in the codebase are the video URL and dialogue text inputs handled?
+
+interpretation:
+user is exploring the codebase and wants to know where the entry points are that
+accept the inputs before passing them into the pipeline. I will point them to the
+specific lines in the CLI and the Web UI code where this happens.
+
+what happened:
+- identified app.py:L110-L114 for the Flask Web UI API endpoint.
+- identified dialogue_finder/cli.py:L32-L33 for the Command Line arguments.
+- explained how both methods pass the inputs to the main pipeline.
+- appended this prompt log to prompts.txt.
