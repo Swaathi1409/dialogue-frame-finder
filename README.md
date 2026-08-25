@@ -152,6 +152,19 @@ Then visit **http://localhost:5001** in your browser.
 
 ---
 
+## Cloud Deployment (Render.com)
+
+The project includes a `render.yaml` file for 1-click deployment to [Render](https://render.com/).
+
+1. Push this code to a repository on GitHub.
+2. Sign up for Render and click **New+** -> **Blueprint**.
+3. Connect your GitHub repository.
+4. Render will automatically read `render.yaml`, build the Docker image, and deploy the web UI to a public URL.
+
+*(Note: The build process takes 10-15 minutes because it downloads PaddleOCR and Whisper models into the container).*
+
+---
+
 ## OK.ru note
 
 OK.ru uses TLS/JA3 fingerprint filtering that actively blocks Python's SSL/network stack from most IPs, making standard `yt-dlp` fail.

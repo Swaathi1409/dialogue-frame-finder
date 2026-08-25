@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: dialogue-frame-finder
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: "web"
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: FLASK_HOST
+        value: 0.0.0.0
+      - key: FLASK_PORT
+        value: 5000
