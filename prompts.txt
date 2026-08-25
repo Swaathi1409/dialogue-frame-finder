@@ -837,3 +837,10 @@ what happened:
 - updated app.py to read FLASK_HOST and FLASK_PORT from environment variables (defaults to 127.0.0.1:5000 for local dev).
 - added flask>=3.0.0 to requirements.txt since app.py depends on it.
 - Docker Desktop Linux engine was not running on the test machine (npipe error). requires starting Docker Desktop manually before building.
+
+- encountered zlib decompression error with pyclipper in Docker build. force-reinstalled pyclipper.
+- made paddleocr pre-download a soft step (|| true) to prevent network hiccups from failing the build.
+- ran docker build with --network=host to bypass DNS resolution issues on Windows for cdn.playwright.dev.
+- tested CLI in Docker successfully (found frame 1312 with 96.2 score).
+- tested web UI in Docker successfully on port 5001.
+
