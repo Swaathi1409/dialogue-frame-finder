@@ -47,6 +47,11 @@ COPY requirements.txt .
 # Install everything. PaddlePaddle is CPU-only by default on non-GPU images.
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Force-reinstall pyclipper to avoid a zlib decompression error that can
+# occur when the compiled extension (.so) gets corrupted during the initial
+# pip install in certain Docker environments.
+RUN pip install --no-cache-dir --force-reinstall pyclipper
+
 # ------- Playwright Chromium -------
 # Install the Chromium browser used for the OK.ru TLS bypass fallback.
 # This bakes the ~300MB browser into the image so it works offline.
@@ -59,7 +64,9 @@ RUN python -c "from faster_whisper import WhisperModel; WhisperModel('tiny', dev
 
 # Pre-download PaddleOCR models (English, detection + recognition).
 # PaddleOCR downloads to ~/.paddleocr on first use; we trigger it here.
-RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=False, lang='en', use_gpu=False, show_log=False)"
+# The '|| true' makes this a soft step: if the model CDN is unreachable
+# during build, the container still works - models download on first run.
+RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=False, lang='en', use_gpu=False, show_log=False)" || true
 
 # ------- Copy application code -------
 # Done after model download so code changes do not bust the model cache layer.
