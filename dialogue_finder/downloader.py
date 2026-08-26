@@ -304,11 +304,19 @@ def _find_video_file(directory: str) -> str | None:
 def _playwright_download_fallback(url: str, output_dir: str) -> str:
     """
     Fallback downloader using headless Chromium via Playwright.
-    
+
     OK.ru uses JA3 fingerprint filtering: Python's ssl / curl / PowerShell are
     blocked. Chromium's TLS fingerprint is not blocked. We use Playwright to
-    navigate to the video page, intercept the direct CDN stream URL, and download
-    it using the browser's own trusted network context.
+    navigate to the video page, intercept the direct CDN stream URL via a
+    network response handler, and download it using the browser's own trusted
+    network context.
+
+    Root cause of "Execution context was destroyed" error:
+      OK.ru redirects the page mid-navigation (e.g. after domcontentloaded but
+      before our JS runs). page.evaluate() fires at the exact moment the context
+      is being torn down. Fix: wrap every page.evaluate() in a try/except so a
+      mid-navigation destroy is silently ignored; rely primarily on the response
+      handler to capture the URL, which fires before any evaluate() call.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -318,144 +326,139 @@ def _playwright_download_fallback(url: str, output_dir: str) -> str:
     out_path = os.path.join(output_dir, "video.mp4")
     os.makedirs(output_dir, exist_ok=True)
 
-    with sync_playwright() as p:
-        # Launch headless first. The fallback logic will throw if it fails,
-        # but headless Chromium is usually sufficient for OK.ru's JA3 block.
-        logger.info("Playwright: Launching Chromium...")
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
-        )
-        page = context.new_page()
-
-        video_url = None
-
-        def handle_response(response):
-            nonlocal video_url
-            if "vkuser.net" in response.url:
-                if response.request.method == "GET" and response.status in (200, 206):
-                    # Check that it's actually serving video content, since the URL itself 
-                    # doesn't contain .mp4 or /video/
-                    if "video" in response.headers.get("content-type", "").lower():
-                        # The CDN often serves video using HTTP Range Requests for DASH chunking,
-                        # appending '&bytes=0-3503' to the URL. If we download that URL as-is, we
-                        # only get the tiny moov atom / init chunk. We must strip the bytes 
-                        # parameter to download the full monolithic video stream.
-                        video_url = re.sub(r"&bytes=\d+-\d+", "", response.url)
-
-        page.on("response", handle_response)
-
+    def _run_with_browser(headless: bool) -> str:
+        """Launch a browser, navigate, intercept CDN URL and download. Returns local path."""
+        browser = None
         try:
-            logger.info("Playwright: Navigating to %s", url)
-            try:
-                page.goto(url, wait_until="domcontentloaded", timeout=config.PLAYWRIGHT_TIMEOUT_MS)
-                
-                # Wait for the video player to load and trigger the stream request
-                logger.info("Playwright: Waiting for video stream request...")
-                page.wait_for_selector("video", timeout=15000)
-                
-                # Force play if needed to trigger the network request
-                page.evaluate("() => { const v = document.querySelector('video'); if (v) v.play(); }")
-                
-                # Wait a few seconds for our response interceptor to catch the URL
-                page.wait_for_timeout(3000)
-            except Exception as nav_err:
-                logger.debug("Playwright: Navigation/Selector timed out (this is OK if URL was already intercepted): %s", nav_err)
-
-            if not video_url:
-                # If network interception failed, try extracting from the video tag src
-                src = page.evaluate("() => { const v = document.querySelector('video'); return v ? v.src : null; }")
-                if src and src.startswith("http"):
-                    video_url = src
-
-            if not video_url:
-                raise RuntimeError("Failed to intercept direct video CDN URL from page.")
-
-            logger.info("Playwright: Found CDN URL, starting download via browser context...")
-            
-            # Important: Download using the browser context to preserve the trusted TLS fingerprint
-            # and any session cookies/tokens that OK.ru's CDN expects.
-            # Timeout is increased to 10 minutes (600000ms) to allow large video downloads to finish.
-            api_request_context = context.request
-            response = api_request_context.get(video_url, timeout=600000)
-            
-            if not response.ok:
-                raise RuntimeError(f"CDN download returned HTTP {response.status}")
-
-            # Save the file
-            with open(out_path, "wb") as f:
-                f.write(response.body())
-                
-            logger.info("Playwright: Download complete: %s", out_path)
-            logger.warning(
-                "NOTE: Playwright fallback downloads a raw browser CDN chunk which often "
-                "lacks an audio track and is low resolution (e.g. 144p-240p). "
-                "This may cause the pipeline to fall back to a full-video scan and OCR may struggle to read pixelated text."
-            )
-            return out_path
-
-        except Exception as e:
-            logger.error("Playwright headless fallback failed: %s", e)
-            if browser:
-                browser.close()
-                
-            # If headless fails (often ERR_SSL_PROTOCOL_ERROR or timeout due to blocking),
-            # try headed mode. Note: this will fail on headless servers (like grader machines),
-            # but this is a last-resort effort for local testing on heavily firewalled networks.
-            logger.info("Playwright: Retrying in headed mode (this will fail on headless servers)...")
-            browser = p.chromium.launch(headless=False)
+            browser = p.chromium.launch(headless=headless)
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/127.0.0.0 Safari/537.36"
+                )
             )
             page = context.new_page()
-            video_url = None
-            page.on("response", handle_response)
-            
-            try:
-                logger.info("Playwright (Headed): Navigating to %s", url)
-                try:
-                    page.goto(url, wait_until="domcontentloaded", timeout=config.PLAYWRIGHT_TIMEOUT_MS)
-                    
-                    logger.info("Playwright (Headed): Waiting for video stream request...")
-                    page.wait_for_selector("video", timeout=15000)
-                    
-                    page.evaluate("() => { const v = document.querySelector('video'); if (v) v.play(); }")
-                    page.wait_for_timeout(3000)
-                except Exception as nav_err:
-                    logger.debug("Playwright (Headed): Navigation/Selector timed out (this is OK if URL was already intercepted): %s", nav_err)
 
-                if not video_url:
-                    src = page.evaluate("() => { const v = document.querySelector('video'); return v ? v.src : null; }")
+            nonlocal video_url
+            video_url = None
+
+            def handle_response(response):
+                nonlocal video_url
+                if video_url:
+                    return  # already captured, skip
+                if "vkuser.net" not in response.url:
+                    return
+                if response.request.method != "GET":
+                    return
+                if response.status not in (200, 206):
+                    return
+                ct = response.headers.get("content-type", "").lower()
+                if "video" not in ct and "octet-stream" not in ct:
+                    return
+                # Strip byte-range suffix so we get the full stream, not a tiny chunk
+                video_url = re.sub(r"&bytes=\d+-\d+", "", response.url)
+                logger.info("Playwright: CDN URL captured via response handler.")
+
+            page.on("response", handle_response)
+
+            mode = "headless" if headless else "headed"
+            logger.info("Playwright (%s): Navigating to %s", mode, url)
+
+            # Step 1: Navigate. Use networkidle so we wait past any internal redirects.
+            # Catch TimeoutError; if the response handler already fired we can continue.
+            try:
+                page.goto(url, wait_until="networkidle", timeout=config.PLAYWRIGHT_TIMEOUT_MS)
+            except Exception as nav_err:
+                logger.debug("Playwright (%s): goto timed out/redirected: %s", mode, nav_err)
+
+            # Step 2: If no URL yet, wait for the <video> element and try to force play.
+            if not video_url:
+                try:
+                    page.wait_for_selector("video", timeout=15000)
+                    logger.info("Playwright (%s): <video> found. Forcing play to trigger stream request.", mode)
+                except Exception:
+                    logger.debug("Playwright (%s): No <video> element found within timeout.", mode)
+
+                # Force play — wrap in try/except: context may be navigating at this point.
+                try:
+                    page.evaluate(
+                        "() => { const v = document.querySelector('video'); if (v) { v.muted = true; v.play(); } }"
+                    )
+                except Exception as eval_err:
+                    # "Execution context was destroyed" happens here during a redirect.
+                    # It is safe to ignore — the response handler has likely already captured the URL.
+                    logger.debug("Playwright (%s): evaluate() context destroyed (expected during redirect): %s", mode, eval_err)
+
+                # Give the network a few seconds to serve the video stream.
+                try:
+                    page.wait_for_timeout(4000)
+                except Exception:
+                    pass
+
+            # Step 3: Last resort — try reading src from the video element.
+            if not video_url:
+                try:
+                    src = page.evaluate(
+                        "() => { const v = document.querySelector('video'); return v ? v.currentSrc || v.src : null; }"
+                    )
                     if src and src.startswith("http"):
                         video_url = src
+                        logger.info("Playwright (%s): CDN URL extracted from <video>.src.", mode)
+                except Exception as eval_err:
+                    logger.debug("Playwright (%s): evaluate() for video.src failed: %s", mode, eval_err)
 
-                if not video_url:
-                    raise RuntimeError("Failed to intercept direct video CDN URL from page in headed mode.")
-
-                logger.info("Playwright (Headed): Found CDN URL, starting download...")
-                api_request_context = context.request
-                response = api_request_context.get(video_url, timeout=600000)
-                
-                if not response.ok:
-                    raise RuntimeError(f"CDN download returned HTTP {response.status}")
-
-                with open(out_path, "wb") as f:
-                    f.write(response.body())
-                    
-                logger.info("Playwright (Headed): Download complete: %s", out_path)
-                logger.warning(
-                    "NOTE: Playwright fallback downloads a raw browser CDN chunk which often "
-                    "lacks an audio track and is low resolution (e.g. 144p-240p). "
-                    "This may cause the pipeline to fall back to a full-video scan and OCR may struggle to read pixelated text."
+            if not video_url:
+                raise RuntimeError(
+                    "OK.ru CDN URL not found. The page may require login or the video "
+                    "is geo-restricted. Try downloading manually at pastedownload.com."
                 )
-                return out_path
-            except Exception as headed_e:
-                logger.error("Playwright headed fallback also failed: %s", headed_e)
-                raise RuntimeError(f"Headless error: {e} | Headed error: {headed_e}") from headed_e
+
+            logger.info("Playwright (%s): Downloading CDN stream...", mode)
+            # Use the browser's own request context so CDN cookies/tokens are sent automatically.
+            api_ctx = context.request
+            resp = api_ctx.get(video_url, timeout=600_000)
+
+            if not resp.ok:
+                raise RuntimeError(f"CDN download returned HTTP {resp.status}")
+
+            with open(out_path, "wb") as f:
+                f.write(resp.body())
+
+            logger.info("Playwright (%s): Download complete: %s", mode, out_path)
+            logger.warning(
+                "NOTE: Playwright fallback often downloads a low-resolution stream "
+                "(144p-240p) without audio because OK.ru CDN serves the smallest chunk "
+                "during initial browser load. For full quality, download manually."
+            )
+            return out_path
         finally:
             if browser:
                 try:
                     browser.close()
                 except Exception:
                     pass
+
+    video_url = None  # shared across _run_with_browser closures
+
+    with sync_playwright() as p:
+        headless_err = None
+        # Attempt 1: headless Chromium
+        try:
+            logger.info("Playwright: Launching Chromium (headless)...")
+            return _run_with_browser(headless=True)
+        except Exception as e:
+            headless_err = e
+            logger.error("Playwright headless fallback failed: %s", e)
+
+        # Attempt 2: headed Chromium (visible window — works locally, fails on servers)
+        logger.info("Playwright: Retrying in headed mode (will fail on headless servers)...")
+        try:
+            return _run_with_browser(headless=False)
+        except Exception as headed_err:
+            logger.error("Playwright headed fallback also failed: %s", headed_err)
+            raise RuntimeError(
+                f"Headless error: {headless_err} | Headed error: {headed_err}"
+            ) from headed_err
+
 
