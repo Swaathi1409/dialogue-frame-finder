@@ -12,7 +12,7 @@ The pipeline runs in three coarse-to-fine stages.
 
 ### Stage 1: Coarse temporal localization via ASR
 
-We transcribe the full audio with faster-whisper (Whisper `base` model, CPU,
+We transcribe the full audio with faster-whisper (Whisper `tiny` model, CPU,
 int8 quantization). This gives timestamped text segments at roughly
 sentence granularity.
 
