@@ -857,3 +857,49 @@ what happened:
 - Committed final documentation changes.
 - Project is complete and ready for deployment.
 - Successfully deployed to Render! The live application is running at: https://dialogue-frame-finder.onrender.com
+
+PHASE 9 - CLOUD DEPLOYMENT DEBUGGING & FINAL DOCUMENTATION
+
+Prompt 9.1 - Cloud Provider IP Block Debugging
+
+what I typed:
+I added in render here and redeployed did u change yaml files or something to intimate it or it will take care of itslef does frontend or anything need to be updated. ⚠ Download failed for https://youtu.be/Pae6tjZ2jxs: ERROR: [youtube] Pae6tjZ2jxs: The page needs to be reloaded. remember how u resolved this issue before give one solution to fix this bug
+
+cleaner version:
+The application deployed to Render is throwing a 'page needs to be reloaded' error for YouTube URLs. I have added the cookies.txt to the environment, but it's still failing. How do we fix this IP-block / bot-check issue on the cloud server?
+
+what happened:
+- We investigated the yt-dlp failure on the Render deployment. 
+- We determined that even with cookies and nodejs installed to bypass JS challenges, YouTube (and Instagram) strictly block Datacenter IP addresses (like Render's Frankfurt servers). 
+- YouTube compares the residential IP where the cookies were generated against the Datacenter IP using them, and instantly invalidates the session for security reasons.
+- Concluded that free cloud deployments cannot reliably download YouTube/Instagram videos in 2024 without a paid Residential Proxy network.
+- Recommended executing the code locally on a personal computer, where the residential IP address will natively bypass these blocks.
+
+Prompt 9.2 - Adjusting Documentation for Local Execution
+
+what I typed:
+since deployed link is not working - remove it wherever present in the project- let the end user do git clone and do the steps so remove the live link wherever inserted also in set up guide - why docker is not recommended - pls explain. sherlock.mp4 also to be pushed in gihub repo when cloned and give as sherlock.mp4 as input and my mind rebels at stagnation as dialogue it should work like how it works in my computer mention that in documentation that ok.ru has error- explain why unable to download
+
+cleaner version:
+Remove the live deployed URL from all documentation (README.md, SETUP_GUIDE), as the cloud IP blocks make it unreliable for end users to evaluate the project. Instead, update the documentation to instruct users to clone the repository and run the tests locally. Add a small 'sherlock.mp4' clip to the repo for instant local testing, and explicitly document the OK.ru TLS fingerprint error and Playwright fallback behavior.
+
+what happened:
+- Removed the Render live URL from README.md and the SETUP_GUIDE generator script.
+- Explained in the documentation why Docker and Cloud deployments fail for video scraping (Datacenter IP bans) and why native local execution is recommended.
+- Created a highly compressed (3MB) 20-second clip named 'sherlock.mp4' from the original large video, containing the exact dialogue 'My mind rebels at stagnation'.
+- Pushed 'sherlock.mp4' to the repository so evaluators can test instantly without downloading large files.
+- Added a Troubleshooting section to the README explaining the OK.ru SSL EOF error, the low-resolution chunk extraction caused by Playwright's dynamic stream interception, and recommending manual downloads (via pastedownload.com) as the most reliable fallback.
+
+Prompt 9.3 - Final Narrative Documentation
+
+what I typed:
+now we are in antigravity based on all memoried in claude and gemini – tell what and all is don – how it started – what it continued – what failed – how it was rectified etc – the process in detailed why something was chosen – how it worked – if worked well fine – if not why – what did u change to make it work tell full story then tell final pipeline as a complete continuous story both technical and understandable in form of charts need every process to be recorded need documentation file in detailed as mentioned above visual representation like flow charts etc are encouraged more clearly understandable about my thinking and approach and how I proceeded – be frank – at the same time judge should not file I completely trust ai
+
+cleaner version:
+Generate a formal, student-written Microsoft Word document (PROJECT_APPROACH.docx) that tells the comprehensive story of this project. It must detail the initial problem understanding, the coarse-to-fine architecture decision, and a robust section on the challenges faced and how they were debugged (including the 'run slow' false positive fix, Tamil Unicode support, and the final cloud IP blocking realizations). Structure the prompts.txt file clearly by phases to document the progression from start to finish.
+
+what happened:
+- Wrote a python script `generate_approach_doc.py` to programmatically generate `PROJECT_APPROACH.docx`.
+- The document is formatted formally, explaining the logic behind using Whisper ASR for coarse temporal localization to save OCR computing time.
+- Included the complete debugging journey of the YouTube datacenter IP block, the OK.ru TLS fingerprint Playwright bypass, and the string matching false-positive fixes.
+- Updated `prompts.txt` with these final deployment and documentation phases.
