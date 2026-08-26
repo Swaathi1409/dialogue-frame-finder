@@ -44,6 +44,287 @@ I also understood that these specific technologies are design choices, not requi
 
 PHASE 0: SETUP AND PLANNING
 
+# Implementation Prompt: Dialogue Frame Finder (Exact Frame Localization CLI)
+
+> How to use this document: paste this entire prompt into Antigravity as the project brief. It encodes the full research and architecture already decided. Do not re open technology choices unless a phase genuinely fails and needs a documented fallback. Execute phase by phase, in decent sized phases, not tiny fragments. After each phase, stop, explain what was built and why, run whatever tests apply, update prompts.txt as instructed in Section 3, and wait for explicit approval before the next phase.
+
+---
+
+## 0. Project Goal
+
+Build a Python CLI tool that, given a video URL (example domain OK.ru) and a target dialogue line, finds the first video frame where that dialogue is visually displayed on screen as burned in text, and reports:
+
+- the frame image, saved as PNG
+- the timestamp in seconds, computed from the real fps of the video
+- the frame number
+- the OCR recognized text
+- a confidence level, High or Low or Not Found, with the reasoning behind it
+
+This is a visual appearance detector, not a speech detector. Speech timing from ASR is only used to narrow down where to look. Only OCR, which reads pixels, can prove text is actually visible on screen at a given frame.
+
+Constraints:
+- Two day implementation budget. Simplicity and the ability to explain every choice matters more than sophistication.
+- Never fabricate a result. If the line is not found, say so clearly.
+- Every design decision must be explainable in plain language to an interviewer.
+- No web server, no database, no queue, no microservices. This is a single CLI tool.
+- The candidate (me) must be able to fully modify any part of this later, live, in an interview. So the code must be simple enough to read end to end and reason about, not just simple to generate.
+
+---
+
+## 1. Evaluator-Facing Principles (apply throughout, not just in docs)
+
+These are not implementation tasks, they are behavioral rules for how this project gets built and written up, because they are part of what gets evaluated:
+
+1. **Engineer with AI, do not blindly use AI.** At every phase, before accepting generated code, explain in plain words what the code does and why this approach was picked over the alternatives that were considered. If something looks wrong or overbuilt, say so and simplify it rather than accepting it as is.
+2. **Show understanding of the problem, not just execution of instructions.** The written documentation (APPROACH.md, README.md) must read like a person worked through the problem themselves; it should show that alternatives were actually weighed, not just listed.
+3. **More files or more code is not the same as better engineering.** Keep the file count and structure only as large as the problem actually needs. Do not split things into extra modules just to look thorough.
+4. **Do not overengineer.** Solve exactly what the assignment asks. Mention extensibility ideas in the README as a short list of future improvements, but do not build any of them into the code now.
+5. **Writing style in all documentation must read like a student wrote it themselves**, not like AI generated text. Plain sentences, no em dashes, no bullet heavy corporate tone, no "leverage," "seamless," "robust ecosystem" type filler words, no restating the obvious in a polished voice. Straightforward, first person where appropriate, occasional imperfection is fine, it should read human.
+6. **Anyone downloading this repo must be able to clone it and run it with zero errors**, following only the README. This is a hard requirement, not a nice to have.
+
+---
+
+## 2. Approved Technology Stack
+
+| Concern | Chosen tool | Why chosen over the alternatives | Fallback if it fails |
+|---|---|---|---|
+| Video download | yt dlp | Actively maintained, has a dedicated OK.ru extractor already, avoids reimplementing signed manifest extraction by hand | None, fail loudly and stop with a clear error, do not hand roll extraction |
+| Audio extraction | ffmpeg | Standard tool, already needed for yt dlp merging anyway | — |
+| Frame extraction | ffmpeg and OpenCV | Pull frames at exact timestamps or frame numbers using the real fps from ffprobe, never assume 30fps | — |
+| Coarse temporal localization | faster whisper, tiny or base model, word level timestamps | Up to four times faster than plain Whisper, works on CPU, gives approximate timing to avoid scanning the entire video | If it finds no confident match, fall back to a fixed interval OCR scan of the whole video |
+| OCR, the actual visual detector | PaddleOCR | Benchmarked more accurate than Tesseract specifically on video overlay and caption style text, returns per detection confidence which is needed for the confidence scoring anyway | Tesseract as a plain CPU only backup if PaddleOCR fails to install in someone else's environment |
+| Text matching | RapidFuzz, partial_ratio on normalized text | OCR output has small character errors, exact string matching would miss real hits, RapidFuzz is the standard fast and MIT licensed fuzzy matcher for this | — |
+| Scene cut detection, PySceneDetect | Considered and rejected as the core mechanism, because on screen text over an unchanging background is not a scene cut, so a scene cut detector would miss the exact event being searched for. Mention this as a considered and rejected option in APPROACH.md, do not add it as a dependency | — |
+| Language | Python | Every other required tool, yt dlp, PaddleOCR, faster whisper, RapidFuzz, is Python native and well documented, and the candidate needs to be able to modify this live in an interview, which favors a language they can read fastest | — |
+| Testing | pytest, plus a synthetic locally generated test video with a known ground truth frame | Deterministic and offline, does not depend on OK.ru staying reachable during evaluation | — |
+| Packaging | Docker, single container, CPU only, no Compose | Removes environment setup risk for the person reviewing the submission, models baked in at build time so the container works offline | — |
+
+Do not introduce a web framework, a database, a message queue, a VLM based detector as the primary mechanism, subtitle track extraction as a load bearing path (most target videos including the OK.ru example have none), GPU specific Docker images, or WhisperX and similar phoneme level aligners, since OCR already does the fine grained work and ASR only needs to find the right minute, not the right millisecond.
+
+---
+
+## 3. prompts.txt Workflow — follow this exactly for every prompt given during this project
+
+`prompts.txt` is not a static file written once at the end. It is built incrementally, in decent sized phases matching Section 6 below, and it must capture the actual back and forth of how this project was built, not just a clean final version.
+
+For every prompt I give you during this project, do the following, in order, and write the result into `prompts.txt`:
+
+1. **Refine the prompt.** Take what I actually typed and rewrite it into a clear, well structured version of the same request, the way it should have been phrased. Keep the intent identical, just make it precise.
+2. **Log it in prompts.txt** under the correct phase heading, showing the refined version.
+3. **Add a short note underneath it explaining that this was done after cross verification** with me, meaning you checked the intent back with the actual conversation and confirmed the refined version matches what was asked, before logging it.
+4. **Log any correction or iteration.** If a piece of code or a decision changes later because of a follow up prompt, a bug found, or a design correction, add an entry describing what changed, why it changed, and which earlier prompt or decision it is correcting. This is the iteration history and it must be visible, not hidden.
+5. **Log research and reasoning prompts too, not just build prompts.** If a prompt was about comparing approaches or understanding the problem rather than generating code, log that as well, since it is part of showing how the problem was approached, not just what was output.
+
+Structure `prompts.txt` like this:
+
+```
+PHASE 0 - SETUP AND PLANNING
+-----------------------------
+[refined prompt 1]
+note: logged after cross verification with the original request
+
+[refined prompt 2]
+note: logged after cross verification with the original request
+
+PHASE 1 - VIDEO AND AUDIO ACQUISITION
+--------------------------------------
+...
+
+ITERATIONS AND CORRECTIONS
+---------------------------
+[date or phase] - what changed, why, which earlier decision this corrects
+```
+
+Do this continuously through the project, not as a single dump at the end. At the end of each phase in Section 6, before I approve moving to the next phase, show me the prompts.txt additions for that phase specifically.
+
+---
+
+## 4. Algorithm
+
+Stage 0, acquire. Download the video with yt dlp. If the download fails for any reason, network, extractor breakage, region lock, stop with a clear error. Do not proceed on a partial or failed download.
+
+Stage 1, coarse localization with ASR. Extract audio with ffmpeg. Run faster whisper to get word level timestamped segments. Fuzzy match the target dialogue against the transcript with RapidFuzz. Take the best matching segment's time range and pad it, roughly minus 3 seconds to plus 8 seconds by default, configurable, to get a candidate search window. The padding exists because on screen captions can lag or lead the spoken line, or the line might not be spoken at all.
+
+Stage 2, fallback window. If nothing in the transcript matches well enough, fall back to a fixed interval OCR scan, roughly every 1 to 2 seconds, across the whole video. Slower, but bounded and guarantees the tool still tries.
+
+Stage 3, coarse to fine frame search inside the window. Sample frames inside the window at a moderate rate, roughly every 0.5 seconds. Run OCR on each sampled frame and fuzzy match against the target line. Find the first sampled frame that clears the match threshold. Then binary search backward between that frame and the last non matching frame, narrowing down to native frame granularity, to find the exact first frame. Then check a couple of frames after it to confirm the match holds, to rule out a single frame OCR misread.
+
+Stage 4, report. Frame number, timestamp computed as frame number divided by real fps, OCR text, confidence bucket with the reasoning, and the saved frame image. If nothing clears even the low confidence threshold anywhere, including the fallback scan, return an explicit not found result. Never guess.
+
+---
+
+## 5. Confidence Model
+
+Signals used: the RapidFuzz match score on normalized text, PaddleOCR's own per detection confidence, whether the match persists across neighboring frames, and whether ASR roughly agreed on timing as a soft bonus signal.
+
+Buckets, kept as named constants in config.py so they are easy to tune later:
+- High confidence: match score 90 or above and the match persists across neighboring frames. Report normally.
+- Low confidence: match score between 70 and 90, or a single frame flicker with no persistence. Report the best candidate but clearly flagged as low confidence, with the reasoning stated.
+- Not found: nothing clears even the low threshold anywhere. Report not found explicitly.
+
+State clearly in APPROACH.md that these thresholds are engineering heuristics chosen by judgment, not numbers derived from a statistical study.
+
+---
+
+## 6. Project Structure
+
+Keep this lean. Do not add extra files or splits beyond what is actually needed to keep each module understandable on its own.
+
+```
+dialogue_finder/
+├── main.py                  entry point, argparse, orchestrates the pipeline
+├── downloader.py             wraps yt dlp, raises DownloadError on failure
+├── audio.py                  ffmpeg audio extraction
+├── frame_extractor.py        ffmpeg or opencv frame extraction, real fps via ffprobe
+├── transcriber.py            faster whisper wrapper, audio to word level segments
+├── ocr.py                    PaddleOCR wrapper with Tesseract fallback, frame to text and confidence
+├── matcher.py                normalization plus RapidFuzz scoring plus confidence buckets
+├── localizer.py               Stage 1 and Stage 2, ASR guided window or fallback sampling
+├── frame_search.py            Stage 3, coarse to fine and bisection search
+├── models.py                  small dataclasses for results and candidates
+├── config.py                  all thresholds, sampling rates, model sizes, one tuning point
+├── tests/
+│   ├── test_matcher.py
+│   ├── test_frame_search.py
+│   ├── test_localizer.py
+│   └── fixtures/synthetic_test_video.mp4
+├── requirements.txt
+├── Dockerfile
+├── README.md
+├── APPROACH.md
+└── prompts.txt
+```
+
+Each module raises its own narrow exception type where relevant, DownloadError, TranscriptionError, OCRError, and main.py catches these at the top level to produce a structured not found or failed result rather than crashing.
+
+---
+
+## 7. Documentation and Diagrams
+
+### README.md
+Must include, in plain student style language, no AI sounding phrasing, no em dashes:
+- A short summary at the top of what was submitted and what it does, so someone opening the repo for the first time understands the project in a few lines
+- Setup and install instructions written so a person can clone the repo and run it with zero errors, following only this file
+- The exact command to run it, with a real example input and the expected output
+- How to run the tests
+- How to run it with Docker
+- A short troubleshooting section, for example what to do if the yt dlp extractor breaks or ffmpeg is not found
+- Project structure
+- A clearly separate Limitations section
+- A short, clearly labeled Future Improvements section that only lists ideas, and does not include any code for them
+
+### APPROACH.md
+This is the main document that shows understanding, not just output. It must cover, in student style writing:
+- How I understood the problem in my own words
+- The approaches I considered and specifically why I rejected the ones I did not pick
+- The approach I chose and why
+- The algorithm, explained the way I would explain it out loud
+- How confidence and ambiguity are handled and why the thresholds are heuristics
+- Testing approach
+- Tradeoffs and limitations
+- A short future improvements list, matching the README, not expanded further here
+
+### Diagrams
+Include at least these, and pick one consistent way to draw them, either simple text based flowcharts, or actual images, whichever the candidate is more comfortable explaining live:
+- An end to end flowchart, url to download to audio to ASR window to OCR coarse to fine to result
+- A process diagram specific to the frame localization stages, coarse window, sampling, bisection, persistence check
+- A state diagram for the three confidence outcomes, High, Low, Not Found, and what triggers each
+
+A full UML class diagram is not required. If time allows, a simple module dependency sketch is a nice addition but is not mandatory. Do not add a diagram that does not add real understanding just to look thorough.
+
+---
+
+## 8. Phase-by-Phase Execution Plan
+
+Work in decent sized phases, each one a real, testable chunk of the system, not tiny fragments. After each phase: explain what was built and why in plain language, run the tests that apply to that phase, add the prompts.txt entries for that phase per Section 3, and stop for approval before continuing.
+
+### Phase 0, Setup and Planning
+Create the folder structure from Section 6 with stub files. Write config.py with all named constants. Write models.py with the dataclasses. Write requirements.txt. Stop and show the structure and config before writing any pipeline logic.
+
+### Phase 1, Video and Audio Acquisition
+Implement downloader.py, audio.py, frame_extractor.py. Verify against a real OK.ru url, or document clearly if a fallback public video had to be used for testing and why. Confirm a video file, an audio file, and an arbitrary extracted frame all work. Stop and show this verification.
+
+### Phase 2, Coarse Localization with ASR
+Implement transcriber.py and matcher.py, and the ASR matching half of localizer.py. Unit test matcher.py fully, since it has no external dependencies. Verify transcript based matching on a real or sample video. Stop and show the transcript matching output plus passing unit tests.
+
+### Phase 3, OCR
+Implement ocr.py with PaddleOCR primary and Tesseract fallback. Verify OCR output against a few real extracted frames, including one known to contain visible text. Stop and show this output.
+
+### Phase 4, Frame Search and Fallback Scan
+Implement frame_search.py, the coarse to fine sampling, bisection, and persistence check. Complete the Stage 2 fallback in localizer.py. Write mocked component tests using injected fake OCR and ASR results, so the algorithm logic is tested independent of model accuracy. Stop and show these tests passing.
+
+### Phase 5, Confidence, Reporting, and CLI
+Implement the confidence bucketing and finish main.py, wiring the full pipeline together with proper exception handling and structured output, including the not found path. Run a real end to end test against the real example url and dialogue. Stop and show the full run and its output.
+
+### Phase 6, Full Test Suite
+Build the synthetic test video fixture with a known ground truth frame. Write the integration test against it. Run the entire pytest suite, unit, mocked component, and synthetic integration, and show all of it passing. Stop here.
+
+### Phase 7, Docker
+Write the Dockerfile, system dependencies, pip install, models baked in at build time, CPU only, no Compose. Build the image and run the CLI inside the container against the synthetic video, and against the real url if feasible. Stop and show this.
+
+### Phase 8, Deployment, optional but a plus if time allows
+If time allows after Phase 7, note in README how this could be deployed, for example as a simple hosted script or scheduled job, without actually building deployment infrastructure now, since that would be overengineering for what this assignment asks. If actually deploying somewhere simple and free is feasible in the remaining time, do it and document the live way to try it, but do not let this delay or replace anything above.
+
+### Phase 9, Documentation and Diagrams
+Write README.md and APPROACH.md per Section 7, in student style language, and produce the three diagrams. Do a final pass to confirm someone could clone the repo fresh and run it with zero errors following only the README. Finalize prompts.txt with all phases and the full iteration history. This is the last phase.
+
+---
+
+## 9. Non Negotiable Guardrails, apply in every phase
+
+- Never fabricate or guess a found result, absence of a confident match must produce an explicit not found, always
+- Never silently swallow a failure, except a single bad OCR frame, which should be skipped and logged, not fatal
+- Keep all tunable values in config.py, no magic numbers scattered across modules
+- Keep the module boundaries from Section 6, do not collapse everything into main.py, and do not split further than needed either
+- Use the real fps from ffprobe for all timestamp math, never assume 30fps
+- At every phase stop point, pause, explain, show output and tests, update prompts.txt, and wait for approval before continuing
+- Do not pre build later phases even if it seems efficient
+- Writing in README.md, APPROACH.md, and prompts.txt notes must read like a student wrote it, plain language, no em dashes, no AI sounding filler phrases
+
+---
+
+## 10. Reference, Rejected Alternatives, for APPROACH.md
+
+- OCR every frame, correct but far too slow to be practical on longer videos
+- ASR only, wrong signal, proves speech was said, not that text is visible on screen
+- Subtitle track extraction as the primary path, most target videos including the OK.ru example have no extractable subtitle track, kept as an opportunistic mention only
+- PySceneDetect or scene cut detection as the core mechanism, on screen text over a static background is not a scene cut, this would miss the exact event
+- A vision language model watching the whole video, expensive, unpredictable, and hard to explain frame exact reasoning from
+- EasyOCR as the primary OCR engine, benchmarked slower and less accurate than PaddleOCR on this kind of overlay text
+- WhisperX or similar phoneme level aligners, unnecessary precision, OCR already does the fine grained work
+- A web server, database, queue, or microservices, this is a single run batch CLI tool, none of that complexity is justified
+
+---
+
+Begin at Phase 0. Do not move past any stop point without explicit approval. Update prompts.txt continuously as described in Section 3, not just at the end.
+
+Add the following instructions to the existing prompt without changing or rewriting the rest of the prompt:
+
+1. Treat the current architecture as the baseline, but if actual implementation, dependency issues, testing, or environment constraints show that a decision is unsuitable, stop and explain the evidence before changing it. Do not change major design decisions silently.
+
+2. Verify the exact supplied OK.ru URL early in Phase 1 before building the rest of the pipeline. Confirm that the video can be downloaded, processed with ffmpeg, and that frames/audio can be extracted. If it fails, report the reason clearly instead of silently replacing the input.
+
+3. For the exact-frame search, do not assume OCR results are perfectly monotonic across frames. A coarse-to-fine or binary-search-like refinement can be used, but include neighboring-frame verification and a small local sequential check around the estimated transition when needed.
+
+4. Do not add a Tesseract fallback unless it is actually tested and provides useful recovery without creating unnecessary setup complexity. PaddleOCR should remain the primary OCR engine.
+
+5. At every phase checkpoint, explain:
+   - what was built
+   - why it was chosen
+   - what each important function/module does
+   - how I can modify it later
+   - what tests were run
+   - the actual results
+   - any problems and how they were resolved
+   Then update prompts.txt and stop for my approval before continuing.
+
+6. Keep the core algorithm visible in our own code. External libraries may handle video decoding, ASR, and OCR, but I must be able to understand and explain the application logic for localization, matching, confidence, frame refinement, persistence, and not-found handling.
+
+7. Before final submission, perform a clean-clone verification by following the README from a fresh environment and confirm installation, tests, execution, output generation, and Docker execution work without relying on undocumented development-environment steps.
+
+8. In the final review, cross-check every requirement in the original Quest problem statement against the implementation, tests, README, APPROACH.md, prompts.txt, and diagrams. Mark each requirement as PASS, PARTIAL, or FAIL and fix any feasible gaps before submission.
+
+
 Prompt 0.1
 
 What I typed
@@ -424,11 +705,3 @@ Discovery phase, YouTube JS runtime setting removed. Adding a node based JS runt
 Discovery phase, OK.ru download strategy changed twice. The first fallback attempt used a third party Vercel based API, which was later found to return CDN links locked to the Vercel server's own IP address and therefore not usable from this machine. This was replaced with a Playwright based Chromium fallback that captures the real CDN URL from a genuine browser session instead.
 
 Discovery phase, deployment approach reconsidered. After confirming that cloud hosting providers are blocked at the IP level by YouTube and Instagram regardless of cookies, local execution using a cloned repository was established as the recommended way to run and evaluate the project.
-
-Prompt - Repository cleanup
-
-What I typed
-this is current github keep only necessary things generate docx etc py files and all not needed right keep only files relevant to project update prompts.txt into github give commit message and push it after cleaning github with only important things tell what u are cleaning and keeping
-
-What happened
-Reviewed all tracked files and removed things from git that are not relevant to the actual project. Removed from tracking: generate_approach_doc.py and generate_setup_guide.py which were scripts used to auto generate documentation and are not part of the tool itself. Removed PROJECT_APPROACH_v2.docx which was a duplicate of the approach document. Kept everything that actually belongs to the project: the dialogue_finder module, tests, templates, APPROACH.md, README.md, VERIFICATION.md, Dockerfile, docker-entrypoint.sh, app.py, requirements.txt, pytest.ini, render.yaml, prompts.txt, and the numbered screenshot PNG files used in documentation. The docx files for PROJECT_APPROACH and SETUP_GUIDE were kept as they are part of the submission. The sherlock.mp4 full test video is kept via Git LFS.

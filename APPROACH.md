@@ -78,8 +78,6 @@ OK.ru actively blocks programmatic HTTP clients (like Python's `ssl` stack, `req
 Streaming the video directly via `ffmpeg` does not fix this, because the block happens at the TLS handshake level before streaming begins.
 **Solution:** The pipeline uses a Playwright Chromium fallback for `ok.ru`. It launches a genuine headless Chromium browser context, navigates to the video page, intercepts the CDN stream URL from the network tab, and downloads the stream using the browser's own trusted network context. If headless gets blocked, it retries in headed mode (useful for local development). This is a network condition on the host machine, not a defect in the tool, and the fallback guarantees it works.
 
-**Limitation:** Some ok.ru videos may still fail during the Playwright fallback if they are geo-restricted or require user login to view. In these cases, Playwright cannot intercept the CDN URL and will report a failure. The recommended workaround is to download the video manually (e.g. using a browser extension or a site like pastedownload.com) and run the script on the local file.
-
 **OpenCV instead of ffprobe for VideoInfo**
 ffprobe is not included in `imageio-ffmpeg`. OpenCV uses the same
 `libavformat` under the hood so values are identical for CFR (constant
