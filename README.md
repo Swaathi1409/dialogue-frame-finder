@@ -1,7 +1,5 @@
 # Dialogue Frame Finder
 
-🚀 **Live Demo:** [https://dialogue-frame-finder.onrender.com](https://dialogue-frame-finder.onrender.com)
-
 Find the exact video frame where a dialogue line is spoken or displayed, given a video URL and the target text.
 
 ## What it does
@@ -171,48 +169,21 @@ All 50+ tests run without a real video or network access.
 
 ---
 
-## Docker Deployment
+## Docker vs. Native Deployment
 
-You can run both the CLI and Web UI via Docker without installing any Python or system dependencies on your machine. The image comes with PaddleOCR, Whisper, and Playwright Chromium pre-baked.
+This repository includes a `Dockerfile` for running the tool via Docker, but **running natively (Steps 1-6 above) is strongly recommended** over Docker for several reasons:
 
-### Build the image
+1. **Cloud IP Blocks (YouTube & Instagram):** Running Docker in a cloud data center will immediately get the tool IP-blocked by YouTube and Instagram (yielding 429 Bot Detection errors). Running natively on your home residential connection bypasses this completely.
+2. **Hardware Acceleration:** Running PaddleOCR and Whisper inside Docker on Windows/Mac relies entirely on the CPU, making analysis much slower. A native Python environment can leverage your local GPU or native CPU optimizations much better.
+3. **Massive Image Size:** The Docker image requires pulling several gigabytes of data (including a full Chromium browser and AI models), making it heavy for local usage.
+
+If you strictly prefer Docker for local use, you can build and run it:
 
 ```bash
-# This takes 10-15 minutes on the first run (bakes AI models and headless browser)
 docker build --network=host -t dialogue-frame-finder .
-```
-
-### Run the CLI
-
-Mount an output directory to save the extracted frame:
-
-```bash
 mkdir -p output
-docker run --rm -v "${PWD}/output:/app/output" dialogue-frame-finder "https://youtu.be/Pae6tjZ2jxs" "so happy you are here today"
+docker run --rm -p 5000:5000 -v "${PWD}/output:/app/output" dialogue-frame-finder web
 ```
-
-### Run the Web UI
-
-Run the container in detached mode (`-d`) and map port 5000:
-
-```bash
-docker run -d -p 5001:5000 --name dff-web dialogue-frame-finder web
-```
-
-Then visit **http://localhost:5001** in your browser.
-
----
-
-## Cloud Deployment (Render.com)
-
-The project includes a `render.yaml` file for 1-click deployment to [Render](https://render.com/).
-
-1. Push this code to a repository on GitHub.
-2. Sign up for Render and click **New+** -> **Blueprint**.
-3. Connect your GitHub repository.
-4. Render will automatically read `render.yaml`, build the Docker image, and deploy the web UI to a public URL.
-
-*(Note: The build process takes 10-15 minutes because it downloads PaddleOCR and Whisper models into the container).*
 
 ---
 

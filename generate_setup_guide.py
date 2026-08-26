@@ -103,10 +103,6 @@ sub.runs[0].bold = True
 sub.runs[0].font.size = Pt(13)
 sub.runs[0].font.color.rgb = RGBColor(0x44, 0x44, 0x44)
 
-live = doc.add_paragraph("🚀 Live Demo: https://dialogue-frame-finder.onrender.com")
-live.alignment = WD_ALIGN_PARAGRAPH.CENTER
-live.runs[0].font.color.rgb = RGBColor(0x1a, 0x56, 0xdb)
-
 doc.add_paragraph()
 doc.add_horizontal_line = lambda: doc.add_paragraph("─" * 80)
 
@@ -265,10 +261,10 @@ for cell in hdr:
         run.bold = True
 
 rows_data = [
-    ("YouTube", "✅ Yes (with cookies.txt)", "⚠ Needs server-side cookies.txt"),
-    ("Instagram", "✅ Yes", "✅ Yes"),
+    ("YouTube", "✅ Yes (with cookies.txt)", "❌ Blocks Data Centers"),
+    ("Instagram", "✅ Yes", "❌ Blocks Data Centers"),
     ("OK.ru", "✅ Yes (via Playwright)", "✅ Yes"),
-    ("Local MP4 file", "✅ Yes", "❌ No (local files only)"),
+    ("Local MP4 file", "✅ Yes", "✅ Yes"),
     ("Any yt-dlp site", "✅ Usually", "⚠ Depends on site"),
 ]
 for src, local, live in rows_data:
@@ -313,19 +309,27 @@ para(
 )
 
 # ── Section 8 ────────────────────────────────────────────────────────────────
-h1("Using the Live Deployed Version")
+h1("Setup Methods: Native Python vs. Docker")
 para(
-    "If you just want to use the tool without installing anything, visit the live site:"
+    "While this project can technically run in Docker, the Native Python setup "
+    "(described in Step 1-6 above) is STRONGLY recommended over Docker for several reasons:"
 )
-code("https://dialogue-frame-finder.onrender.com")
-note(
-    "The live site runs on Render's free tier and may be 'asleep' if no one has "
-    "used it recently. When you first click Analyze, the button will show "
-    "'Waking up server (~50s)…' — this is normal. Wait about 50 seconds and it will start."
-)
-warn(
-    "The live site cannot download YouTube videos due to YouTube's cloud-server IP ban. "
-    "Use Instagram or OK.ru URLs on the live site. For YouTube videos, run the tool locally."
+bulleted([
+    ("YouTube and Instagram Restrictions: ", 
+     "If you run Docker in a cloud data center, YouTube and Instagram will instantly block "
+     "the video downloads because they blacklist cloud IPs to prevent bots. Running natively "
+     "on your home computer bypasses this because you are using a residential internet connection."),
+    ("Hardware Acceleration: ", 
+     "Running AI models (like Whisper and PaddleOCR) inside Docker on Windows or Mac is usually "
+     "limited to CPU processing and can be extremely slow. A native setup can more easily leverage "
+     "your hardware."),
+    ("Massive File Sizes: ", 
+     "The Docker image is multiple gigabytes because it has to bundle the entire Chromium browser "
+     "and all AI models into the image, making it cumbersome to build and run locally."),
+])
+tip(
+    "Always use the Native Python setup (Step 1-6) on your local computer for the "
+    "most reliable, fastest, and error-free experience."
 )
 
 # ── Section 9 ────────────────────────────────────────────────────────────────
@@ -344,5 +348,5 @@ p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 p.runs[0].font.color.rgb = RGBColor(0x88, 0x88, 0x88)
 p.runs[0].font.size = Pt(9)
 
-doc.save("SETUP_GUIDE.docx")
-print("SETUP_GUIDE.docx created successfully!")
+doc.save("SETUP_GUIDE_v2.docx")
+print("SETUP_GUIDE_v2.docx created successfully!")
