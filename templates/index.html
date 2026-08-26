@@ -739,8 +739,19 @@
   function showError(msg) {
     const el = document.getElementById('errorBanner');
 
+    // Cloud IP block by YouTube
+    if (msg.includes("cloud server's IP address") || msg.includes('data center IP')) {
+      el.innerHTML = `
+        <strong>⚠ YouTube is blocking this cloud server</strong><br>
+        YouTube blocks downloads from cloud/data-center IP addresses. Try one of these alternatives:
+        <ol style="margin:8px 0 0 18px;line-height:2">
+          <li>Use an <strong>Instagram video URL</strong> instead — Instagram works reliably ✅</li>
+          <li>Use an <strong>OK.ru video URL</strong> instead ✅</li>
+          <li>Run the tool <strong>locally</strong> on your own machine (home IP addresses are not blocked)</li>
+        </ol>`;
+
     // YouTube cookie error — show actionable instructions
-    if (msg.includes('cookies.txt') || msg.includes('Export your YouTube')) {
+    } else if (msg.includes('cookies.txt') || msg.includes('Export your YouTube')) {
       el.innerHTML = `
         <strong>⚠ YouTube requires authentication</strong><br>
         To download this video, export your YouTube cookies:<br>

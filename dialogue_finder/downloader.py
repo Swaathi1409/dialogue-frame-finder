@@ -128,9 +128,9 @@ def download_video(url: str, output_dir: str) -> str:
         # Retries: fail fast rather than hanging for minutes on a bad URL.
         "retries": 1,
         "fragment_retries": 1,
-        # Bypass YouTube bot detection which targets web clients. 
-        # MUST NOT include 'web' in this list, or it will trigger the 429 block.
-        "extractor_args": {"youtube": ["player_client=android", "player_client=ios"]},
+        # Use tv_embedded client which does not require a webpage fetch and
+        # avoids the 429 IP block that YouTube applies to cloud server IPs.
+        "extractor_args": {"youtube": ["player_client=tv_embedded,android,ios"]},
     }
 
     # Auto-detect cookies.txt in the project root for YouTube bot-detection bypass.
@@ -165,15 +165,20 @@ def download_video(url: str, output_dir: str) -> str:
     except Exception as e:
         err_str = str(e)
 
-        # YouTube bot-detection: retry with cookies from the local browser.
-        # yt-dlp raises this when YouTube requires a logged-in session.
+        # YouTube bot-detection: YouTube IP-bans cloud server addresses (like
+        # Render, AWS, etc.). The web client triggers this instantly; mobile
+        # clients (android/ios/tv_embedded) work most of the time, but if
+        # YouTube has also blocked those, cookies are the only remaining option.
         if _is_bot_detection(err_str):
             raise DownloadError(
-                f"YouTube requires authentication to download this video. "
-                f"Export your YouTube cookies using the 'Get cookies.txt LOCALLY' "
-                f"Chrome extension, save the file as 'cookies.txt' in the project "
-                f"root folder, and try again. "
-                f"(Original error: {str(e)[:120]})"
+                f"YouTube is blocking downloads from this cloud server's IP address. "
+                f"This is a known YouTube anti-bot restriction on data center IPs. "
+                f"Please try one of these alternatives:\n"
+                f"  • Use an Instagram video URL instead (Instagram works reliably)\n"
+                f"  • Use an OK.ru video URL\n"
+                f"  • If you must use YouTube: export your cookies.txt from Chrome "
+                f"(using the 'Get cookies.txt LOCALLY' extension) and upload it "
+                f"to the server as 'cookies.txt' in the app root folder."
             )
 
         # For ok.ru, Python's TLS stack is blocked by OK.ru's JA3 fingerprint
