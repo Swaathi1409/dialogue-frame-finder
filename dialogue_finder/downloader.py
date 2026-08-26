@@ -128,8 +128,9 @@ def download_video(url: str, output_dir: str) -> str:
         # Retries: fail fast rather than hanging for minutes on a bad URL.
         "retries": 1,
         "fragment_retries": 1,
-        # Bypass YouTube bot detection which targets web clients
-        "extractor_args": {"youtube": ["client=android,ios,tv,web"]},
+        # Bypass YouTube bot detection which targets web clients. 
+        # MUST NOT include 'web' in this list, or it will trigger the 429 block.
+        "extractor_args": {"youtube": ["player_client=android", "player_client=ios"]},
     }
 
     # Auto-detect cookies.txt in the project root for YouTube bot-detection bypass.
