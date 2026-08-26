@@ -24,7 +24,13 @@ htmlcov/
 # Output directory (generated frame PNGs)
 output/
 
-# Downloaded videos and audio (can be large)
+# Downloaded test video leftovers
+chunk_type_*.mp4
+test_video_sherlock.mp4
+prompts2.txt
+
+# Screenshots (kept locally, not in repo)
+*.png
 *.mp4
 *.mkv
 *.webm
