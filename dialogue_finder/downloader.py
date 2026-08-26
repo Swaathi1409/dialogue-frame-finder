@@ -139,6 +139,9 @@ def download_video(url: str, output_dir: str) -> str:
     if _cookies_path:
         logger.info("Using cookies file: %s", _cookies_path)
         ydl_opts["cookiefile"] = _cookies_path
+        # When using browser cookies, we must allow the 'web' client, 
+        # as mobile APIs often reject standard browser cookies.
+        ydl_opts.pop("extractor_args", None)
 
     # Tell yt-dlp where to find ffmpeg for stream merging.
     if ffmpeg_dir:
