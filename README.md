@@ -15,70 +15,119 @@ Given a video URL (OK.ru, YouTube, or any yt-dlp-supported site) and a target di
 
 ---
 
-## Quick Start
+## Complete Setup Guide (Local Machine)
 
-### 1. Install dependencies
+> **Also available as a Word document:** [`SETUP_GUIDE.docx`](SETUP_GUIDE.docx) — printable and shareable.
+
+### Prerequisites
+
+Before starting, install:
+- **Python 3.10+** → [python.org/downloads](https://www.python.org/downloads/) *(check "Add to PATH" on Windows)*
+- **Git** → [git-scm.com](https://git-scm.com/downloads)
+- **Google Chrome** → needed only for YouTube cookie export
+
+---
+
+### Step 1 — Clone the repository
+
+```bash
+git clone https://github.com/Swaathi1409/dialogue-frame-finder.git
+cd dialogue-frame-finder
+```
+
+---
+
+### Step 2 — Create a virtual environment *(recommended)*
+
+```bash
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# Mac / Linux
+source venv/bin/activate
+```
+
+---
+
+### Step 3 — Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
+```
+
+> ⚠ **Do NOT upgrade PaddleOCR or paddlepaddle.** They are pinned to `2.7.3` / `2.6.2`. Upgrading crashes the tool on CPU-only machines.
+
+---
+
+### Step 4 — Install the Playwright browser *(for OK.ru videos)*
+
+```bash
 playwright install chromium
 ```
 
-Requires **Python 3.10+** and **Node.js** (for YouTube extraction).  
-No system ffmpeg or Tesseract needed — ffmpeg is bundled.
+---
 
-> **Note:** PaddleOCR is pinned to `2.7.3` + `paddlepaddle==2.6.2`. Do not upgrade — PaddleOCR 3.x crashes on Windows CPU. See `prompts.txt` for details.
+### Step 5 — Set up YouTube cookies *(for YouTube videos)*
+
+YouTube blocks script-based downloads (bot detection). Each person must export **their own** cookies from their own logged-in Chrome browser — once. After that, YouTube downloads work permanently on your machine.
+
+1. Install **[Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)** in Chrome
+2. Make sure you are **logged into YouTube** in Chrome
+3. Go to **[youtube.com](https://youtube.com)** (homepage — not a video). Accept any consent banner.
+4. Click the extension icon → **Export**
+5. Save the file as **`cookies.txt`** in the project root folder (same folder as `app.py`)
+
+> `cookies.txt` is in `.gitignore` and will never be committed to GitHub.  
+> ⚠ **Each person who clones this repo must export their OWN cookies** — cookies are tied to a specific YouTube account and cannot be shared.
 
 ---
 
-### 2a. Web UI (recommended)
+### Step 6 — Run
 
+**Web UI (recommended):**
 ```bash
 python app.py
 ```
+Open **http://localhost:5000** in your browser.
 
-Open **http://localhost:5000** in your browser. Enter the video URL and dialogue, click Analyze.
+**Command line:**
+```bash
+python -m dialogue_finder "https://youtu.be/VIDEO_ID" "dialogue to find"
+```
 
 ---
 
-### 2b. Command line
+## Supported video sources
 
-```bash
-# OK.ru (auto-fallback downloader built in)
-python -m dialogue_finder "https://ok.ru/video/248244667877" "My mind rebels at stagnation"
+| Source | Works locally? | Works on live site? |
+|---|---|---|
+| YouTube | ✅ Yes (with cookies.txt) | ⚠ Needs server-side cookies |
+| Instagram | ✅ Yes | ✅ Yes |
+| OK.ru | ✅ Yes (via Playwright) | ✅ Yes |
+| Local MP4 | ✅ Yes | ❌ No |
 
-# YouTube (requires cookies.txt — see below)
-python -m dialogue_finder "https://youtu.be/HAnw168huqA" "might draw a few of you here"
+---
 
-# Local file
-python -m dialogue_finder sherlock.mp4 "My mind rebels at stagnation"
+## Common errors & fixes
 
-# Verbose output
-python -m dialogue_finder "https://ok.ru/video/248244667877" "My mind rebels at stagnation" --verbose
-```
+**`Sign in to confirm you're not a bot`** → Export a fresh `cookies.txt` from Chrome (Step 5 above).
 
-Options:
+**`pyclipper` / `zlib` crash** → Run: `pip install --force-reinstall pyclipper`
+
+**`No module named playwright`** → Run: `pip install playwright && playwright install chromium`
+
+---
+
+## Command line options
+
 ```
 --output-dir DIR    Where to save the result PNG (default: output/)
 --work-dir DIR      Temp dir for download/audio (auto-cleaned if not set)
 --json              Print result as JSON
 --verbose           Show pipeline stage logs
 ```
-
----
-
-## YouTube authentication (cookies.txt)
-
-YouTube requires a logged-in session to download many videos. To enable this:
-
-1. Install **[Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)** in Chrome
-2. Log into YouTube in Chrome, then go to [youtube.com](https://youtube.com)
-3. Click the extension icon → **Export**
-4. Save the file as **`cookies.txt`** in this project's root folder
-
-The tool detects `cookies.txt` automatically. You only need to do this once.
-
-> `cookies.txt` is in `.gitignore` and will not be committed.
 
 ---
 
