@@ -13,6 +13,34 @@ Given a video URL (OK.ru, YouTube, or any yt-dlp-supported site) and a target di
 
 ---
 
+## Sample Screenshots:
+
+Testing with the Sherlock Video (given for assignment)
+
+<img width="773" height="454" alt="image" src="https://github.com/user-attachments/assets/126c5b20-a618-4495-83cc-f27e8b1566df" />
+<img width="291" height="453" alt="image" src="https://github.com/user-attachments/assets/bcdf08b4-058c-49d4-943e-6d6fea56cf85" />
+<img width="1078" height="672" alt="image" src="https://github.com/user-attachments/assets/d3febce4-4a5d-4690-a56b-81e64ebcd991" />
+
+Testing with the Sherlock Video (given for assignment)
+
+<img width="944" height="398" alt="image" src="https://github.com/user-attachments/assets/969dc9df-8fcc-4bec-a81e-82d72274b250" />
+<img width="958" height="383" alt="image" src="https://github.com/user-attachments/assets/efc84f74-d782-470e-94b0-8e6c8163417a" />
+Verifying in YouTube:
+<img width="897" height="588" alt="image" src="https://github.com/user-attachments/assets/85693d4a-069d-40c3-9b13-8178b1239dea" />
+
+Testing Instagram videos:
+
+In CLI:
+<img width="1052" height="283" alt="image" src="https://github.com/user-attachments/assets/32e72f1e-82cb-4334-9df7-03d33edb37ce" />
+
+In UI:
+<img width="736" height="472" alt="image" src="https://github.com/user-attachments/assets/1d7b7ce5-53f7-4f0a-a1a8-7e63b63e7e53" />
+<img width="741" height="489" alt="image" src="https://github.com/user-attachments/assets/825a4a72-f945-4d4e-9fe7-dd68fc30ab72" />
+Verifying in Instagram:
+<img width="719" height="531" alt="image" src="https://github.com/user-attachments/assets/2fed58ec-ea4b-4d01-91d4-4cd5a9ffd14a" />
+
+---
+
 ## Complete Setup Guide (Local Machine)
 
 > **Also available as a Word document:** [`SETUP_GUIDE.docx`](SETUP_GUIDE.docx) — printable and shareable.
