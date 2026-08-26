@@ -28,6 +28,7 @@ FROM python:3.11-slim
 # libglib2.0-0 : OpenCV dependency
 # libgomp1     : OpenMP runtime required by PaddlePaddle CPU kernels
 # wget, ca-certificates : needed by Playwright browser installer
+# nodejs       : JavaScript runtime required by yt-dlp to solve YouTube n-sig challenges
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libgl1 \
@@ -35,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     wget \
     ca-certificates \
+    nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # ------- Working directory -------
