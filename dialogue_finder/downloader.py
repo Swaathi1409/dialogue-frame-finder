@@ -216,7 +216,9 @@ def download_video(url: str, output_dir: str) -> str:
 
 def _is_bot_detection(err_str: str) -> bool:
     """Check if the error string indicates YouTube bot detection."""
-    return any(x in err_str.lower() for x in [
+    # yt-dlp sometimes uses curly apostrophes in error messages
+    err_lower = err_str.lower().replace("’", "'")
+    return any(x in err_lower for x in [
         "sign in to confirm you're not a bot",
         "bot detection",
         "suspended",
