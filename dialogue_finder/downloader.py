@@ -126,9 +126,10 @@ def download_video(url: str, output_dir: str) -> str:
         "no_warnings": False,
         "logger": logging.getLogger("yt_dlp"),
         # Retries: fail fast rather than hanging for minutes on a bad URL.
-        # Retries: fail fast rather than hanging for minutes on a bad URL.
         "retries": 1,
         "fragment_retries": 1,
+        # Bypass YouTube bot detection which targets web clients
+        "extractor_args": {"youtube": ["client=android,ios,tv,web"]},
     }
 
     # Auto-detect cookies.txt in the project root for YouTube bot-detection bypass.
