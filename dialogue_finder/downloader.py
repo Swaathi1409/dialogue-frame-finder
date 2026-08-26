@@ -365,10 +365,9 @@ def _playwright_download_fallback(url: str, output_dir: str) -> str:
             mode = "headless" if headless else "headed"
             logger.info("Playwright (%s): Navigating to %s", mode, url)
 
-            # Step 1: Navigate. Use networkidle so we wait past any internal redirects.
-            # Catch TimeoutError; if the response handler already fired we can continue.
+            # Step 1: Navigate. Use domcontentloaded so we don't wait forever on video chunks.
             try:
-                page.goto(url, wait_until="networkidle", timeout=config.PLAYWRIGHT_TIMEOUT_MS)
+                page.goto(url, wait_until="domcontentloaded", timeout=config.PLAYWRIGHT_TIMEOUT_MS)
             except Exception as nav_err:
                 logger.debug("Playwright (%s): goto timed out/redirected: %s", mode, nav_err)
 

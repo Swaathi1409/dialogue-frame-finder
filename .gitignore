@@ -58,3 +58,24 @@ scratch/
 
 cookies.txt
 !sherlock.mp4
+
+# Generator scripts (used during development, not part of the project)
+generate_approach_doc.py
+generate_setup_guide.py
+generate_all_screenshots.py
+append_prompts.py
+render_terminal.py
+
+# Scratch / tree files
+repo_tree.txt
+repo_tree_ps.txt
+repo_tree*.txt
+directory_structure*.jpg
+
+# Word temp lock files
+~$*.docx
+
+# Downloaded test video leftovers
+chunk_type_*.mp4
+test_video_sherlock.mp4
+prompts2.txt
