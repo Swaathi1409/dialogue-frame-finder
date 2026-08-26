@@ -90,9 +90,20 @@ python app.py
 ```
 Open **http://localhost:5000** in your browser.
 
-**Command line:**
+**2b. Command line**
+
+> **Tip:** You can test the tool immediately using the included `sherlock.mp4` clip!
+> Run: `python -m dialogue_finder sherlock.mp4 "My mind rebels at stagnation"`
+
 ```bash
-python -m dialogue_finder "https://youtu.be/VIDEO_ID" "dialogue to find"
+# Local file
+python -m dialogue_finder sherlock.mp4 "My mind rebels at stagnation"
+
+# OK.ru (auto-fallback downloader built in)
+python -m dialogue_finder "https://ok.ru/video/248244667877" "My mind rebels at stagnation"
+
+# YouTube (requires cookies.txt — see below)
+python -m dialogue_finder "https://youtu.be/HAnw168huqA" "might draw a few of you here"
 ```
 
 ---
@@ -187,10 +198,20 @@ docker run --rm -p 5000:5000 -v "${PWD}/output:/app/output" dialogue-frame-finde
 
 ---
 
-## OK.ru note
+## OK.ru note & Troubleshooting
 
-OK.ru uses TLS/JA3 fingerprint filtering that actively blocks Python's SSL/network stack from most IPs, making standard `yt-dlp` fail.
+OK.ru uses TLS/JA3 fingerprint filtering that actively blocks Python's SSL/network stack from most IPs (resulting in a `[SSL: UNEXPECTED_EOF_WHILE_READING]` error).
 
-To bypass this network block, the tool automatically falls back to **Playwright**. It will launch a genuine headless Chromium instance, navigate to the video page, intercept the direct CDN stream URL, and download it using the browser's own trusted network context. If headless mode gets blocked by the firewall, it will automatically retry in a visible headed browser (for local testing).
+To bypass this network block, the tool automatically falls back to **Playwright**. It launches a genuine headless Chromium instance, navigates to the video page, intercepts the direct CDN stream URL, and downloads it using the browser's own trusted network context.
 
-Because Playwright is used, you must run `playwright install chromium` once during setup.
+**Why is the Playwright fallback low resolution?**
+Playwright intercepts the stream URL directly from the video player as it loads. Often, OK.ru serves the lowest quality chunk (144p - 240p) during initial page load to save bandwidth. This means the fallback download is often low resolution and might lack audio.
+
+**Recommended Solution:**
+If you want high-resolution frames from OK.ru (or if the Playwright fallback fails), download the video manually to your local computer first using a site like [pastedownload.com](https://pastedownload.com) or [okrudownloader.top](https://okrudownloader.top). Once downloaded, run the tool on the local file:
+
+```bash
+python -m dialogue_finder "my_downloaded_video.mp4" "dialogue to find"
+```
+
+Because `Playwright` is used for the fallback, you must run `playwright install chromium` once during setup.
