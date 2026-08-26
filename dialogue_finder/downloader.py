@@ -225,25 +225,33 @@ def _find_cookies_file() -> str | None:
     """
     Search for a cookies.txt file to pass to yt-dlp.
 
-    Users can export this once from Chrome using the
-    'Get cookies.txt LOCALLY' extension (available on Chrome Web Store).
-    Steps:
-      1. Install the extension
-      2. Log into YouTube in Chrome
-      3. Click the extension icon on youtube.com -> Export
-      4. Save as 'cookies.txt' in the project root folder
+    On the deployed Render server, set a Secret File at path /etc/secrets/cookies.txt
+    and set the environment variable YOUTUBE_COOKIES_PATH=/etc/secrets/cookies.txt.
+    yt-dlp will use these cookies to bypass YouTube's cloud-server IP block.
 
-    We check several common locations so the user doesn't need to
-    configure anything - just drop the file in the right place.
+    For local use, export cookies.txt from Chrome using the
+    'Get cookies.txt LOCALLY' extension and place it in the project root.
     """
-    candidates = [
+    candidates = []
+
+    # 1. Explicit env var (used by Render Secret Files and other cloud platforms)
+    env_path = os.environ.get("YOUTUBE_COOKIES_PATH")
+    if env_path:
+        candidates.append(env_path)
+
+    # 2. Standard local locations (for running on your own machine)
+    candidates += [
         os.path.join(os.getcwd(), "cookies.txt"),
         os.path.join(os.path.dirname(__file__), "..", "cookies.txt"),
+        "/etc/secrets/cookies.txt",  # Render secret file default path
     ]
+
     for path in candidates:
         path = os.path.normpath(path)
         if os.path.isfile(path):
+            logger.info("Found YouTube cookies file at: %s", path)
             return path
+
     return None
 
 
